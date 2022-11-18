@@ -1,0 +1,38 @@
+
+; detects whether the PC is in a restricted area
+eldenring.exe.text+4ED7A0 - 44 0FB7 D2            - movzx r10d,dx
+eldenring.exe.text+4ED7A4 - 48 B8 8988888888888888 - mov rax,8888888888888889
+eldenring.exe.text+4ED7AE - 66 45 85 D2           - test r10w,r10w
+eldenring.exe.text+4ED7B2 - 4C 8B D9              - mov r11,rcx
+eldenring.exe.text+4ED7B5 - 45 8B C2              - mov r8d,r10d
+eldenring.exe.text+4ED7B8 - 41 0F95 C1            - setne r9l
+eldenring.exe.text+4ED7BC - 49 F7 E2              - mul r10
+eldenring.exe.text+4ED7BF - 48 C1 EA 03           - shr rdx,03
+eldenring.exe.text+4ED7C3 - 48 6B C2 0F           - imul rax,rdx,0F
+eldenring.exe.text+4ED7C7 - BA 0F000000           - mov edx,0000000F
+eldenring.exe.text+4ED7CC - 4C 2B C0              - sub r8,rax
+eldenring.exe.text+4ED7CF - 43 8D 04 08           - lea eax,[r8+r9]
+eldenring.exe.text+4ED7D3 - C0 E0 02              - shl al,02
+eldenring.exe.text+4ED7D6 - 0FB6 C8               - movzx ecx,al
+eldenring.exe.text+4ED7D9 - 48 D3 E2              - shl rdx,cl
+eldenring.exe.text+4ED7DC - 49 85 53 28           - test [r11+28],rdx
+eldenring.exe.text+4ED7E0 - 74 34                 - je eldenring.exe.text+4ED816
+eldenring.exe.text+4ED7E2 - 49 8B 43 08           - mov rax,[r11+08]
+eldenring.exe.text+4ED7E6 - 48 85 C0              - test rax,rax
+eldenring.exe.text+4ED7E9 - 74 2B                 - je eldenring.exe.text+4ED816
+eldenring.exe.text+4ED7EB - F7 40 60 03000C80     - test [rax+60],800C0003
+eldenring.exe.text+4ED7F2 - 75 19                 - jne eldenring.exe.text+4ED80D
+eldenring.exe.text+4ED7F4 - 48 8B 08              - mov rcx,[rax]
+eldenring.exe.text+4ED7F7 - 48 85 C9              - test rcx,rcx
+eldenring.exe.text+4ED7FA - 74 09                 - je eldenring.exe.text+4ED805
+eldenring.exe.text+4ED7FC - 0FB7 91 56010000      - movzx edx,word ptr [rcx+00000156]
+eldenring.exe.text+4ED803 - EB 02                 - jmp eldenring.exe.text+4ED807
+eldenring.exe.text+4ED805 - 33 D2                 - xor edx,edx
+eldenring.exe.text+4ED807 - 66 41 3B D2           - cmp dx,r10w
+eldenring.exe.text+4ED80B - 74 06                 - je eldenring.exe.text+4ED813
+eldenring.exe.text+4ED80D - 48 8B 40 30           - mov rax,[rax+30]
+eldenring.exe.text+4ED811 - EB D3                 - jmp eldenring.exe.text+4ED7E6
+eldenring.exe.text+4ED813 - B0 01                 - mov al,01
+eldenring.exe.text+4ED815 - C3                    - ret 
+eldenring.exe.text+4ED816 - 32 C0                 - xor al,al
+eldenring.exe.text+4ED818 - C3                    - ret 
