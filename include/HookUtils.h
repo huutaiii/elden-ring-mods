@@ -125,7 +125,8 @@ public:
 class UHookRelativeIntermediate
 {
 public:
-    static const uint8_t op = 0xE8;
+    static const uint8_t opCall = 0xE8;
+    static const uint8_t opJmp = 0xE9;
     static const unsigned char opSize = 5;
 
 private:
@@ -136,6 +137,7 @@ private:
     size_t numBytes = 5;
     MVirtualAlloc& allocator = MVirtualAlloc::Get();
 
+    bool bUseCall;
     bool bCanHook = false;
     bool bEnabled = false;
     std::unique_ptr<UHookAbsoluteNoCopy> upJmpAbs;
@@ -146,13 +148,23 @@ private:
         lpIntermediate = allocator.Alloc(numBytes + 14 + rspUp.size() + rspDown.size()); // one 14B jump, two 3B adds
 
         // move stack pointer up so stolen instructions can access the stack
-        ModUtils::MemCopy(uintptr_t(lpIntermediate), uintptr_t(rspUp.data()), rspUp.size());
+        if (bUseCall)
+        {
+            ModUtils::MemCopy(uintptr_t(lpIntermediate), uintptr_t(rspUp.data()), rspUp.size());
+        }
+        else
+        {
+            ModUtils::MemSet(uintptr_t(lpIntermediate), 0x90, numBytes + 14 + rspUp.size() + rspDown.size());
+        }
 
         // copy to be stolen bytes to the imtermediate location
         ModUtils::MemCopy(reinterpret_cast<uint64_t>(lpIntermediate) + rspUp.size(), reinterpret_cast<uint64_t>(lpHook), numBytes);
 
         // move stack pointer down so the custom code can return
-        ModUtils::MemCopy(uintptr_t(lpIntermediate) + rspUp.size() + numBytes, uintptr_t(rspDown.data()), rspDown.size());
+        if (bUseCall)
+        {
+            ModUtils::MemCopy(uintptr_t(lpIntermediate) + rspUp.size() + numBytes, uintptr_t(rspDown.data()), rspDown.size());
+        }
 
         // create jump from intermediate code to custom code
         upJmpAbs = std::make_unique<UHookAbsoluteNoCopy>(lpIntermediate, lpDestination, rspUp.size() + numBytes + rspDown.size());
@@ -170,6 +182,7 @@ public:
         size_t numStolenBytes,
         LPVOID destination,
         int offset = 0,
+        uintptr_t *pReturnAddress = nullptr,
         std::string msg = "Unknown Hook",
         std::function<void()> enable = []() {},
         std::function<void()> disable = []() {}
@@ -178,6 +191,11 @@ public:
     {
         lpHook = reinterpret_cast<LPVOID>(ModUtils::SigScan(signature, false, msg, true) + offset);
         bCanHook = lpHook != nullptr;
+        bUseCall = pReturnAddress == nullptr;
+        if (bCanHook && !bUseCall)
+        {
+            *pReturnAddress = uintptr_t(lpHook) + numStolenBytes;
+        }
         //Init();
     }
 
@@ -203,7 +221,7 @@ public:
         ModUtils::MemSet(reinterpret_cast<uintptr_t>(lpHook), 0x90, numBytes);
 
         // write instruction at hook address
-        *static_cast<uint8_t*>(lpHook) = op;
+        *static_cast<uint8_t*>(lpHook) = bUseCall ? opCall : opJmp;
         uint32_t relOffset = static_cast<uint32_t>(static_cast<uint8_t*>(lpIntermediate) - static_cast<uint8_t*>(lpHook) - opSize);
         *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(lpHook) + 1) = relOffset;
 

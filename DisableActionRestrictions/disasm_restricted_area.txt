@@ -13,7 +13,7 @@ eldenring.exe.text+4ED7C7 - BA 0F000000           - mov edx,0000000F
 eldenring.exe.text+4ED7CC - 4C 2B C0              - sub r8,rax
 eldenring.exe.text+4ED7CF - 43 8D 04 08           - lea eax,[r8+r9]
 eldenring.exe.text+4ED7D3 - C0 E0 02              - shl al,02
-eldenring.exe.text+4ED7D6 - 0FB6 C8               - movzx ecx,al
+eldenring.exe.text+4ED7D6 - 0FB6 C8               - movzx ecx,al					; inject here
 eldenring.exe.text+4ED7D9 - 48 D3 E2              - shl rdx,cl
 eldenring.exe.text+4ED7DC - 49 85 53 28           - test [r11+28],rdx
 eldenring.exe.text+4ED7E0 - 74 34                 - je eldenring.exe.text+4ED816
