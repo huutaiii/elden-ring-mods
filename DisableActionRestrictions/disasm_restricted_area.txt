@@ -36,3 +36,92 @@ eldenring.exe.text+4ED813 - B0 01                 - mov al,01
 eldenring.exe.text+4ED815 - C3                    - ret 
 eldenring.exe.text+4ED816 - 32 C0                 - xor al,al
 eldenring.exe.text+4ED818 - C3                    - ret 
+
+
+
+eldenring.exe.text+4EE029 - 33 F6                 - xor esi,esi
+eldenring.exe.text+4EE02B - E9 C0456900           - jmp eldenring.exe.text+B825F0
+eldenring.exe.text+4EE030 - 40 53                 - push rbx
+eldenring.exe.text+4EE032 - 48 83 EC 30           - sub rsp,30
+eldenring.exe.text+4EE036 - 33 C0                 - xor eax,eax
+eldenring.exe.text+4EE038 - C7 44 24 20 FFFFFFFF  - mov [rsp+20],FFFFFFFF
+eldenring.exe.text+4EE040 - 48 8B D9              - mov rbx,rcx
+eldenring.exe.text+4EE043 - 89 44 24 24           - mov [rsp+24],eax
+eldenring.exe.text+4EE047 - 48 8D 4C 24 20        - lea rcx,[rsp+20]
+eldenring.exe.text+4EE04C - 48 89 44 24 28        - mov [rsp+28],rax
+eldenring.exe.text+4EE051 - E8 7A207D00           - call eldenring.exe.text+CC00D0
+eldenring.exe.text+4EE056 - 48 8B 44 24 28        - mov rax,[rsp+28]
+eldenring.exe.text+4EE05B - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE05E - 0F84 E0000000         - je eldenring.exe.text+4EE144
+eldenring.exe.text+4EE064 - 0FB6 50 32            - movzx edx,byte ptr [rax+32]
+eldenring.exe.text+4EE068 - 8B C2                 - mov eax,edx
+eldenring.exe.text+4EE06A - C1 E8 03              - shr eax,03
+eldenring.exe.text+4EE06D - A8 01                 - test al,01
+eldenring.exe.text+4EE06F - 74 47                 - je eldenring.exe.text+4EE0B8
+eldenring.exe.text+4EE071 - 48 B8 00000000F0000000 - mov rax,000000F000000000
+eldenring.exe.text+4EE07B - 48 85 43 28           - test [rbx+28],rax
+eldenring.exe.text+4EE07F - 74 37                 - je eldenring.exe.text+4EE0B8
+eldenring.exe.text+4EE081 - 48 8B 43 08           - mov rax,[rbx+08]
+eldenring.exe.text+4EE085 - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE088 - 74 2E                 - je eldenring.exe.text+4EE0B8
+eldenring.exe.text+4EE08A - 41 B8 16010000        - mov r8d,00000116
+eldenring.exe.text+4EE090 - F7 40 60 03000C80     - test [rax+60],800C0003
+eldenring.exe.text+4EE097 - 75 16                 - jne eldenring.exe.text+4EE0AF
+eldenring.exe.text+4EE099 - 48 8B 08              - mov rcx,[rax]
+eldenring.exe.text+4EE09C - 48 85 C9              - test rcx,rcx
+eldenring.exe.text+4EE09F - 74 0E                 - je eldenring.exe.text+4EE0AF
+eldenring.exe.text+4EE0A1 - 66 44 39 81 56010000  - cmp [rcx+00000156],r8w
+eldenring.exe.text+4EE0A9 - 0F84 95000000         - je eldenring.exe.text+4EE144
+eldenring.exe.text+4EE0AF - 48 8B 40 30           - mov rax,[rax+30]
+eldenring.exe.text+4EE0B3 - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE0B6 - 75 D8                 - jne eldenring.exe.text+4EE090
+eldenring.exe.text+4EE0B8 - C1 EA 06              - shr edx,06
+eldenring.exe.text+4EE0BB - F6 C2 01              - test dl,01
+eldenring.exe.text+4EE0BE - 75 43                 - jne eldenring.exe.text+4EE103
+eldenring.exe.text+4EE0C0 - 48 B8 000000000F000000 - mov rax,0000000F00000000
+eldenring.exe.text+4EE0CA - 48 85 43 28           - test [rbx+28],rax
+eldenring.exe.text+4EE0CE - 74 33                 - je eldenring.exe.text+4EE103			; change je to jmp unblocks spell casting
+eldenring.exe.text+4EE0D0 - 48 8B 43 08           - mov rax,[rbx+08]
+eldenring.exe.text+4EE0D4 - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE0D7 - 74 2A                 - je eldenring.exe.text+4EE103
+eldenring.exe.text+4EE0D9 - BA C9010000           - mov edx,000001C9
+eldenring.exe.text+4EE0DE - 66 90                 - nop 2
+eldenring.exe.text+4EE0E0 - F7 40 60 03000C80     - test [rax+60],800C0003
+eldenring.exe.text+4EE0E7 - 75 11                 - jne eldenring.exe.text+4EE0FA
+eldenring.exe.text+4EE0E9 - 48 8B 08              - mov rcx,[rax]
+eldenring.exe.text+4EE0EC - 48 85 C9              - test rcx,rcx
+eldenring.exe.text+4EE0EF - 74 09                 - je eldenring.exe.text+4EE0FA
+eldenring.exe.text+4EE0F1 - 66 39 91 56010000     - cmp [rcx+00000156],dx
+eldenring.exe.text+4EE0F8 - 74 4A                 - je eldenring.exe.text+4EE144
+eldenring.exe.text+4EE0FA - 48 8B 40 30           - mov rax,[rax+30]
+eldenring.exe.text+4EE0FE - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE101 - 75 DD                 - jne eldenring.exe.text+4EE0E0
+eldenring.exe.text+4EE103 - 48 8D 4C 24 20        - lea rcx,[rsp+20]
+eldenring.exe.text+4EE108 - E8 C31C7D00           - call eldenring.exe.text+CBFDD0
+eldenring.exe.text+4EE10D - 0FB6 D0               - movzx edx,al
+eldenring.exe.text+4EE110 - 48 8B CB              - mov rcx,rbx
+eldenring.exe.text+4EE113 - E8 782C0000           - call eldenring.exe.text+4F0D90
+eldenring.exe.text+4EE118 - 84 C0                 - test al,al
+eldenring.exe.text+4EE11A - 75 30                 - jne eldenring.exe.text+4EE14C
+eldenring.exe.text+4EE11C - 48 8B 44 24 28        - mov rax,[rsp+28]
+eldenring.exe.text+4EE121 - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE124 - 74 1E                 - je eldenring.exe.text+4EE144
+eldenring.exe.text+4EE126 - 8B 48 08              - mov ecx,[rax+08]
+eldenring.exe.text+4EE129 - 85 C9                 - test ecx,ecx
+eldenring.exe.text+4EE12B - 78 17                 - js eldenring.exe.text+4EE144
+eldenring.exe.text+4EE12D - 48 8B 43 08           - mov rax,[rbx+08]
+eldenring.exe.text+4EE131 - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE134 - 74 0E                 - je eldenring.exe.text+4EE144
+eldenring.exe.text+4EE136 - 39 48 08              - cmp [rax+08],ecx
+eldenring.exe.text+4EE139 - 74 11                 - je eldenring.exe.text+4EE14C
+eldenring.exe.text+4EE13B - 48 8B 40 30           - mov rax,[rax+30]
+eldenring.exe.text+4EE13F - 48 85 C0              - test rax,rax
+eldenring.exe.text+4EE142 - 75 F2                 - jne eldenring.exe.text+4EE136
+eldenring.exe.text+4EE144 - 32 C0                 - xor al,al
+eldenring.exe.text+4EE146 - 48 83 C4 30           - add rsp,30
+eldenring.exe.text+4EE14A - 5B                    - pop rbx
+eldenring.exe.text+4EE14B - C3                    - ret 
+eldenring.exe.text+4EE14C - B0 01                 - mov al,01
+eldenring.exe.text+4EE14E - 48 83 C4 30           - add rsp,30
+eldenring.exe.text+4EE152 - 5B                    - pop rbx
+eldenring.exe.text+4EE153 - C3                    - ret 

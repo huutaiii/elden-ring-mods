@@ -12,13 +12,26 @@ extern "C" void OverrideRestrictedArea();
 
 DWORD WINAPI MainThread(LPVOID lpParam)
 {
-    std::vector<uint16_t> pattern({ 0x44, 0x0F, 0xB7, MASK, 0x48, 0xB8, MASK, MASK, MASK, MASK, MASK, MASK, MASK, MASK, 0x66, 0x45, 0x85, MASK, MASK, 0x8B, MASK, MASK, 0x8B, MASK });
-    uintptr_t address = ModUtils::SigScan(pattern);
-    if (address)
     {
-        UHookAbsoluteNoCopy(reinterpret_cast<void*>(address), &OverrideRestrictedArea).Enable();
+        std::vector<uint16_t> pattern({ 0x44, 0x0F, 0xB7, MASK, 0x48, 0xB8, MASK, MASK, MASK, MASK, MASK, MASK, MASK, MASK, 0x66, 0x45, 0x85, MASK, MASK, 0x8B, MASK, MASK, 0x8B });
+        uintptr_t address = ModUtils::SigScan(pattern);
+        if (address)
+        {
+            UHookAbsoluteNoCopy(reinterpret_cast<void*>(address), &OverrideRestrictedArea).Enable();
+        }
     }
 
+    {
+        std::vector<uint16_t> pattern({ 0x75, MASK, 0x48, 0xB8, MASK, MASK, MASK, MASK, MASK, MASK, MASK, MASK, 0x48, 0x85, MASK, MASK, 0x74, 0x33, 0x48, 0x8B, MASK, MASK, 0x48, 0x85, MASK, 0x74, MASK, 0xBA, MASK, MASK, MASK, MASK, 0x66, 0x90 });
+        uintptr_t address = ModUtils::SigScan(pattern);
+        if (address)
+        {
+            address += 16;
+            ModUtils::MemSet(address, 0xEB, 1);
+        }
+    }
+
+    ModUtils::CloseLog();
     return 0;
 }
 
