@@ -1,6 +1,7 @@
 # Elden Ring Mods
 ## Mods
  - DisableActionRestrictions: allows actions that would otherwise be prohibited in The Roundtable Hold and some other areas
+ - DisableSharpenFilter: disable sharpening post-processing shader which can cause ringing artifacts.
 ## Dependency
 [EldenRingModLoader](https://github.com/techiew/EldenRingModLoader)
 ## Credits
