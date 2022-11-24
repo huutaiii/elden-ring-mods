@@ -21,8 +21,13 @@ std::vector<std::shared_ptr<UHookRelativeIntermediate>> Hooks;
 DWORD WINAPI MainThread(LPVOID lpParam)
 {
     {
-        std::vector<uint16_t> pattern({ 0x0F, 0xB6, MASK, MASK, 0xD3, MASK, 0x49, 0x85, 0x53, 0x28, 0x74, MASK, MASK, 0x8B, MASK, MASK, MASK, 0x85 });
-        Hooks.push_back(std::make_shared<UHookRelativeIntermediate>(pattern, 6, &OverrideRestrictedArea, 0, &ReturnAddress, "HookDisableRestrictions"));
+        std::vector<uint16_t> pattern({ 0xE8, MASK, MASK, MASK, MASK, 0x84, 0xC0, 0x74, MASK, 0x44, 0x0F, 0xB6, MASK, 0x33, MASK, 0x48, 0x8B, MASK, 0xE8, MASK, MASK, MASK, MASK, 0x44, 0x0F, 0xB6 });
+        uintptr_t address = ModUtils::SigScan(pattern);
+        if (address)
+        {
+            address += 7;
+            ModUtils::MemSet(address, 0xEB, 1);
+        }
     }
 
     for (std::shared_ptr<UHookRelativeIntermediate> pHook : Hooks)
@@ -30,6 +35,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         pHook->Enable();
     }
 
+    // unblock spell casting
     {
         std::vector<uint16_t> pattern({ 0x75, MASK, 0x48, 0xB8, MASK, MASK, MASK, MASK, MASK, MASK, MASK, MASK, 0x48, 0x85, MASK, MASK, 0x74, 0x33, 0x48, 0x8B, MASK, MASK, 0x48, 0x85, MASK, 0x74, MASK, 0xBA, MASK, MASK, MASK, MASK, 0x66, 0x90 });
         uintptr_t address = ModUtils::SigScan(pattern);
@@ -37,6 +43,18 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         {
             address += 16;
             ModUtils::MemSet(address, 0xEB, 1);
+        }
+    }
+
+    // fix the hud
+    {
+        std::vector<uint16_t> pattern = { 0xE8, MASK, MASK, MASK, MASK, 0x88, 0x44, MASK, MASK, 0x4D, 0x8D, MASK, MASK, MASK, MASK, MASK, 0x4D, 0x85, MASK, 0x0F, 0x84, MASK, MASK, MASK, MASK, 0x49, 0x8B, MASK, 0xE8 };
+        uintptr_t address = ModUtils::SigScan(pattern, false, "", true);
+        if (address)
+        {
+            ModUtils::MemSet(address, 0x90, 5);
+            const char* xor_al_al = "\x30\xC0";
+            ModUtils::MemCopy(address, reinterpret_cast<uintptr_t>(xor_al_al), 2);
         }
     }
 
