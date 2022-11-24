@@ -18,7 +18,7 @@ std::vector<uint8_t> UTF16ToAOB(std::u16string s16)
     return out;
 }
 
-DWORD MainThread(LPVOID params)
+DWORD WINAPI MainThread(LPVOID params)
 {
     std::vector<uint8_t> pattern = UTF16ToAOB(std::u16string(SHADER_NAME));
     uintptr_t address = ModUtils::SigScan(std::vector<uint16_t>(pattern.begin(), pattern.end()), true, std::string(pattern.begin(), pattern.end()));
