@@ -36,9 +36,4 @@
   <ItemGroup>
     <Text Include="disasm_restricted_area.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <MASM Include="hook.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
-  </ItemGroup>
 </Project>
