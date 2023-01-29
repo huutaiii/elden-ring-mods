@@ -483,7 +483,7 @@ template<size_t size, typename T>
 inline std::vector<T> INIReader::GetVector(const std::string& section, const std::string& name, std::vector<T> default_value) const
 {
     std::string valstr = Get(section, name, "");
-    std::replace_if(valstr.begin(), valstr.end(), [](unsigned char c) { return std::string("0123456789.").find(c) == std::string::npos; }, ' ');
+    std::replace_if(valstr.begin(), valstr.end(), [](unsigned char c) { return std::string("0123456789.-").find(c) == std::string::npos; }, ' ');
     std::istringstream stream(valstr);
     std::istream_iterator<double> iterator(stream);
     std::istream_iterator<double> end;

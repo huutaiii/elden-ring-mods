@@ -111,6 +111,7 @@ namespace ModUtils
 		}
 
 		va_list args;
+		#pragma warning(suppress: 4840)
 		va_start(args, msg);
 		vprintf(std::string(muModuleName + " > " + msg + "\n").c_str(), args);
 		if (muLogFile != nullptr)
@@ -345,6 +346,7 @@ namespace ModUtils
 	}
 
 	// Winapi callback that receives all active window handles one by one.
+	#pragma warning(suppress: 4100)
 	inline BOOL CALLBACK EnumWindowHandles(HWND hwnd, LPARAM lParam)
 	{
 		DWORD processId = NULL;
@@ -402,7 +404,7 @@ namespace ModUtils
 	}
 
 	// Checks if a hotkey or a combination of hotkeys is pressed.
-	inline bool CheckHotkey(WORD key, WORD modifier = HK_NONE, bool checkController = false)
+	inline bool CheckHotkey(WORD key, WORD modifier = HK_NONE, bool checkController = false, bool bLogKey = false)
 	{
 		static std::vector<unsigned int> notReleasedKeys;
 		static bool retrievedWindowHandle = false;
@@ -487,7 +489,10 @@ namespace ModUtils
 			return false;
 		}
 
-		Log("Key: %i, modifier: %i", keyPressed, modifierPressed);
+		if (bLogKey)
+		{
+			Log("Key: %i, modifier: %i", keyPressed, modifierPressed);
+		}
 		notReleasedKeys.push_back(key);
 		return true;
 	}

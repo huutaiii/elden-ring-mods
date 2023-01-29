@@ -1,0 +1,51 @@
+
+eldenring.exe.text+3B1C90 - 40 55                 - push rbp							; called once per frame
+eldenring.exe.text+3B1C92 - 53                    - push rbx
+eldenring.exe.text+3B1C93 - 56                    - push rsi
+eldenring.exe.text+3B1C94 - 57                    - push rdi
+eldenring.exe.text+3B1C95 - 41 56                 - push r14
+eldenring.exe.text+3B1C97 - 41 57                 - push r15
+eldenring.exe.text+3B1C99 - 48 8D AC 24 98FEFFFF  - lea rbp,[rsp-00000168]
+eldenring.exe.text+3B1CA1 - 48 81 EC 68020000     - sub rsp,00000268
+eldenring.exe.text+3B1CA8 - 44 0F29 BC 24 C0010000  - movaps [rsp+000001C0],xmm15
+eldenring.exe.text+3B1CB1 - 48 8B 05 48687903     - mov rax,[eldenring.exe.data+132500]
+eldenring.exe.text+3B1CB8 - 48 33 C4              - xor rax,rsp
+eldenring.exe.text+3B1CBB - 48 89 85 B0000000     - mov [rbp+000000B0],rax
+eldenring.exe.text+3B1CC2 - 4C 8B 35 67838A03     - mov r14,[eldenring.exe+3C5B030]
+eldenring.exe.text+3B1CC9 - 4D 8B F9              - mov r15,r9
+eldenring.exe.text+3B1CCC - 49 8B D8              - mov rbx,r8
+eldenring.exe.text+3B1CCF - 44 0F28 F9            - movaps xmm15,xmm1
+eldenring.exe.text+3B1CD3 - 48 8B F1              - mov rsi,rcx							; rsi <- base pointer to struct with various lockon camera data
+eldenring.exe.text+3B1CD6 - 4D 85 F6              - test r14,r14
+eldenring.exe.text+3B1CD9 - 75 2E                 - jne eldenring.exe.text+3B1D09
+eldenring.exe.text+3B1CDB - 48 8D 0D 1FDC8803     - lea rcx,[eldenring.exe.data+229901]
+eldenring.exe.text+3B1CE2 - E8 79A2A701           - call eldenring.exe.text+1E2BF60
+eldenring.exe.text+3B1CE7 - 4C 8B C8              - mov r9,rax
+eldenring.exe.text+3B1CEA - 4C 8D 05 3F8EE102     - lea r8,[eldenring.exe.rdata+8CCB30]
+eldenring.exe.text+3B1CF1 - BA B4000000           - mov edx,000000B4
+eldenring.exe.text+3B1CF6 - 48 8D 0D 234D5602     - lea rcx,[eldenring.exe.rdata+18A20]
+eldenring.exe.text+3B1CFD - E8 1E26A701           - call eldenring.exe.text+1E24320
+eldenring.exe.text+3B1D02 - 4C 8B 35 27838A03     - mov r14,[eldenring.exe+3C5B030]
+eldenring.exe.text+3B1D09 - 0F28 96 90020000      - movaps xmm2,[rsi+00000290]
+eldenring.exe.text+3B1D10 - 48 8D 8E 8C040000     - lea rcx,[rsi+0000048C]
+eldenring.exe.text+3B1D17 - 0F28 86 80020000      - movaps xmm0,[rsi+00000280]
+eldenring.exe.text+3B1D1E - F3 0F10 8E D0020000   - movss xmm1,[rsi+000002D0]
+...
+
+
+eldenring.exe.text+D89AC2 - 40 53                 - push rbx
+eldenring.exe.text+D89AC4 - 48 83 EC 20           - sub rsp,20
+eldenring.exe.text+D89AC8 - 48 8B DA              - mov rbx,rdx
+eldenring.exe.text+D89ACB - E9 39CD96FF           - jmp eldenring.exe.text+6F6809
+eldenring.exe.text+D89AD0 - F3 0F10 05 58CB4402   - movss xmm0,[eldenring.exe.rdata+8D8630]
+eldenring.exe.text+D89AD8 - F3 0F11 49 04         - movss [rcx+04],xmm1						; sets frametime
+eldenring.exe.text+D89ADD - F3 0F58 09            - addss xmm1,[rcx]
+eldenring.exe.text+D89AE1 - 0F2F C8               - comiss xmm1,xmm0
+eldenring.exe.text+D89AE4 - F3 0F11 09            - movss [rcx],xmm1
+eldenring.exe.text+D89AE8 - 72 15                 - jb eldenring.exe.text+D89AFF
+eldenring.exe.text+D89AEA - F3 0F10 15 DEBCD801   - movss xmm2,[eldenring.exe.rdata+2177D0]
+eldenring.exe.text+D89AF2 - F3 0F58 CA            - addss xmm1,xmm2
+eldenring.exe.text+D89AF6 - 0F2F C8               - comiss xmm1,xmm0
+eldenring.exe.text+D89AF9 - 73 F7                 - jae eldenring.exe.text+D89AF2
+eldenring.exe.text+D89AFB - F3 0F11 09            - movss [rcx],xmm1
+eldenring.exe.text+D89AFF - C3                    - ret 

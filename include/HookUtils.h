@@ -38,23 +38,26 @@ private:
     DWORD bytesAllocated = 0;
     DWORD currentPageSize = 0;
 
-    void Scan()
+    LPVOID Scan()
     {
         lpScan = lpScan ? lpScan : (LPBYTE)baseAddress;
-        SIZE_T numBytes = VirtualQuery(lpScan, &memInfo, sizeof(memInfo));
+        SIZE_T numBytes;
 
-        while (numBytes)
+        do
         {
+            lpScan -= sys.dwAllocationGranularity;
+            numBytes = VirtualQuery(lpScan, &memInfo, sizeof(memInfo));
+
             lpScan = static_cast<LPBYTE>(memInfo.BaseAddress);
 
             if (memInfo.State == MEM_FREE)
             {
-                break;
+                return lpScan;
             }
-
-            lpScan -= sys.dwAllocationGranularity;
-            numBytes = VirtualQuery(lpScan, &memInfo, sizeof(memInfo));
         }
+        while (numBytes);
+
+        return nullptr;
     }
 
 public:
@@ -67,7 +70,7 @@ public:
     // dwSize in [1..4096]
     LPVOID Alloc(SIZE_T dwSize, DWORD flAllocType = MEM_RESERVE | MEM_COMMIT, DWORD flProtec = PAGE_EXECUTE_READWRITE)
     {
-        if (dwSize > 0x1000)
+        if (dwSize > sys.dwPageSize)
         {
             return nullptr;
         }
@@ -76,11 +79,18 @@ public:
 
         if (!lpCurrent || bytesAllocated > currentPageSize)
         {
-            Scan();
+            LPVOID lpAlloc = Scan();
+
+            if (!lpAlloc)
+            {
+                ModUtils::RaiseError("Cannot allocate memory");
+                return nullptr;
+            }
+
             ModUtils::Log("Allocating page at: %p", lpScan);
 
             // Preallocate a region equals to system page size (typically 4KiB)
-            lpCurrent = VirtualAlloc(lpScan, sys.dwPageSize, flAllocType, flProtec);
+            lpCurrent = VirtualAlloc(lpAlloc, sys.dwPageSize, flAllocType, flProtec);
 
             bytesAllocated = static_cast<DWORD>(dwSize);
             currentPageSize = static_cast<DWORD>(sys.dwPageSize);
@@ -99,8 +109,6 @@ class UHookAbsoluteNoCopy
 
     LPVOID lpHook;
     LPVOID lpDest;
-
-    UHookAbsoluteNoCopy(UHookAbsoluteNoCopy&) = delete;
 
 public:
     void Enable()
@@ -125,87 +133,149 @@ public:
 class UHookRelativeIntermediate
 {
 public:
-    static const uint8_t opCall = 0xE8;
-    static const uint8_t opJmp = 0xE9;
-    static const unsigned char opSize = 5;
+    static const uint8_t OpCall = 0xE8;
+    static const uint8_t OpJmp = 0xE9;
+    static const unsigned char RelJmpSize = 5;
 
 private:
+    MVirtualAlloc& allocator = MVirtualAlloc::Get();
 
     LPVOID lpHook = nullptr;
     LPVOID lpIntermediate = nullptr;
-    LPVOID lpDestination = nullptr;
-    size_t numBytes = 5;
-    MVirtualAlloc& allocator = MVirtualAlloc::Get();
+    bool bExecuteOriginal = true;
 
-    bool bUseCall;
+    LPVOID lpDestination;
+    size_t numBytes;
+
+    bool bUseCall = true;
+
     bool bCanHook = false;
     bool bEnabled = false;
     std::unique_ptr<UHookAbsoluteNoCopy> upJmpAbs;
+    size_t JumpOffset;
+    size_t StolenBytesOffset;
+
+    std::function<void()> fnEnable = []() {};
+    std::function<void()> fnDisable = []() {};
 
     // Initialize the intermediate code that we can decide to jump to later
     void Init()
     {
-        lpIntermediate = allocator.Alloc(numBytes + 14 + rspUp.size() + rspDown.size()); // one 14B jump, two 3B adds
+        // we still need to store the stolen code somewhere even when we don't want to execute it
 
-        // move stack pointer up so stolen instructions can access the stack
+        size_t SPDownOffset = RSPUp.size() + numBytes;
+
         if (bUseCall)
         {
-            ModUtils::MemCopy(uintptr_t(lpIntermediate), uintptr_t(rspUp.data()), rspUp.size());
+            lpIntermediate = allocator.Alloc(numBytes + 14 + RSPUp.size() + RSPDown.size()); // one 14B jump, two 3B adds
+            JumpOffset = numBytes + RSPUp.size() + RSPDown.size();
+            StolenBytesOffset = RSPUp.size();
         }
         else
         {
-            ModUtils::MemSet(uintptr_t(lpIntermediate), 0x90, numBytes + 14 + rspUp.size() + rspDown.size());
+            lpIntermediate = allocator.Alloc(numBytes + 14);
+            JumpOffset = numBytes;
+            StolenBytesOffset = 0;
+        }
+
+        if (bUseCall)
+        {
+            // move stack pointer up so stolen instructions can access the stack
+            ModUtils::MemCopy(uintptr_t(lpIntermediate), uintptr_t(RSPUp.data()), RSPUp.size());
         }
 
         // copy to be stolen bytes to the imtermediate location
-        ModUtils::MemCopy(reinterpret_cast<uint64_t>(lpIntermediate) + rspUp.size(), reinterpret_cast<uint64_t>(lpHook), numBytes);
+        ModUtils::MemCopy(reinterpret_cast<uint64_t>(lpIntermediate) + StolenBytesOffset, reinterpret_cast<uint64_t>(lpHook), numBytes);
 
-        // move stack pointer down so the custom code can return
         if (bUseCall)
         {
-            ModUtils::MemCopy(uintptr_t(lpIntermediate) + rspUp.size() + numBytes, uintptr_t(rspDown.data()), rspDown.size());
+            // write an instruction to move the stack pointer back down
+            ModUtils::MemCopy(uintptr_t(lpIntermediate) + SPDownOffset, uintptr_t(RSPDown.data()), RSPDown.size());
         }
 
         // create jump from intermediate code to custom code
-        upJmpAbs = std::make_unique<UHookAbsoluteNoCopy>(lpIntermediate, lpDestination, rspUp.size() + numBytes + rspDown.size());
+        upJmpAbs = std::make_unique<UHookAbsoluteNoCopy>(lpIntermediate, lpDestination, JumpOffset);
         upJmpAbs->Enable();
 
         ModUtils::Log("Generated hook '%s' from %p to %p at %p", msg.c_str(), lpHook, lpDestination, lpIntermediate);
+    }
+
+private:
+
+    inline void UHookRelativeIntermediate_Internal(std::vector<uint16_t> pattern, int offset, uintptr_t *pReturnAddress)
+    {
+        lpHook = reinterpret_cast<LPVOID>(ModUtils::SigScan(pattern, false, msg, true) + offset);
+        bCanHook = lpHook != nullptr;
+        bUseCall = pReturnAddress == nullptr;
+        if (!bUseCall)
+        {
+            *pReturnAddress = reinterpret_cast<uintptr_t>((char*)lpHook + numBytes);
+        }
     }
 
 public:
     const std::string msg;
 
     UHookRelativeIntermediate(UHookRelativeIntermediate&) = delete;
+
     UHookRelativeIntermediate(
         std::vector<uint16_t> signature,
         size_t numStolenBytes,
         LPVOID destination,
         int offset = 0,
+        bool bExecuteOriginal = true,
         uintptr_t *pReturnAddress = nullptr,
         std::string msg = "Unknown Hook",
         std::function<void()> enable = []() {},
         std::function<void()> disable = []() {}
     )
-        : numBytes(numStolenBytes), lpDestination(destination), msg(msg), fnEnable(enable), fnDisable(disable)
+        : numBytes(numStolenBytes), lpDestination(destination), msg(msg), fnEnable(enable), fnDisable(disable), bExecuteOriginal(bExecuteOriginal)
     {
-        lpHook = reinterpret_cast<LPVOID>(ModUtils::SigScan(signature, false, msg, true) + offset);
-        bCanHook = lpHook != nullptr;
-        bUseCall = pReturnAddress == nullptr;
-        if (bCanHook && !bUseCall)
-        {
-            *pReturnAddress = uintptr_t(lpHook) + numStolenBytes;
-        }
-        //Init();
+        UHookRelativeIntermediate_Internal(signature, offset, pReturnAddress);
+    }
+
+    UHookRelativeIntermediate(
+        std::string id,
+        std::vector<uint16_t> signature,
+        size_t numStolenBytes,
+        LPVOID destination,
+        int offset = 0
+    )
+        : numBytes(numStolenBytes), lpDestination(destination), msg(id)
+    {
+        UHookRelativeIntermediate_Internal(signature, offset, nullptr);
+    }
+
+    UHookRelativeIntermediate(
+        std::string id,
+        std::vector<uint16_t> signature,
+        size_t numStolenBytes,
+        LPVOID destination,
+        bool bExecuteOriginal,
+        int offset = 0
+    )
+        : numBytes(numStolenBytes), lpDestination(destination), msg(id), bExecuteOriginal(bExecuteOriginal)
+    {
+        UHookRelativeIntermediate_Internal(signature, offset, nullptr);
+    }
+
+    UHookRelativeIntermediate(
+        std::string id,
+        std::vector<uint16_t> signature,
+        size_t numStolenBytes,
+        LPVOID destination,
+        uintptr_t* pReturnAddress,
+        int offset = 0
+    )
+        : msg(id), numBytes(numStolenBytes), lpDestination(destination)
+    {
+        UHookRelativeIntermediate_Internal(signature, offset, pReturnAddress);
     }
 
     const bool HasFoundSignature() const { return bCanHook; }
 
-    static const std::vector<uint8_t> rspUp; // lea rsp,[rsp+8] (5B)
-    static const std::vector<uint8_t> rspDown; // lea rsp,[rsp-8] (5B)
-
-    std::function<void()> fnEnable;
-    std::function<void()> fnDisable;
+    static const std::vector<uint8_t> RSPUp; // lea rsp,[rsp+8] (5B)
+    static const std::vector<uint8_t> RSPDown; // lea rsp,[rsp-8] (5B)
 
     void Enable()
     {
@@ -221,8 +291,10 @@ public:
         ModUtils::MemSet(reinterpret_cast<uintptr_t>(lpHook), 0x90, numBytes);
 
         // write instruction at hook address
-        *static_cast<uint8_t*>(lpHook) = bUseCall ? opCall : opJmp;
-        uint32_t relOffset = static_cast<uint32_t>(static_cast<uint8_t*>(lpIntermediate) - static_cast<uint8_t*>(lpHook) - opSize);
+        *static_cast<uint8_t*>(lpHook) = bUseCall ? OpCall : OpJmp;
+        uint32_t relOffset = static_cast<uint32_t>(static_cast<uint8_t*>(lpIntermediate) - static_cast<uint8_t*>(lpHook) - RelJmpSize);
+        relOffset += uint32_t(bExecuteOriginal ? 0 : JumpOffset);
+
         *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(lpHook) + 1) = relOffset;
 
         fnEnable();
@@ -232,7 +304,7 @@ public:
     {
         if (!bEnabled) { return; }
         ModUtils::Log("Disabling hook '%s' from %p to %p", msg.c_str(), lpHook, lpDestination);
-        ModUtils::MemCopy(uintptr_t(lpHook), uintptr_t(lpIntermediate) + rspUp.size(), numBytes);
+        ModUtils::MemCopy(uintptr_t(lpHook), uintptr_t(lpIntermediate) + StolenBytesOffset, numBytes);
 
         fnDisable();
         bEnabled = false;
@@ -244,5 +316,5 @@ public:
     ~UHookRelativeIntermediate() { Disable(); }
 };
 
-const std::vector<uint8_t> UHookRelativeIntermediate::rspUp({ 0x48, 0x8D, 0x64, 0x24, 0x08 });
-const std::vector<uint8_t> UHookRelativeIntermediate::rspDown({ 0x48, 0x8D, 0x64, 0x24, 0xf8 });
+const std::vector<uint8_t> UHookRelativeIntermediate::RSPUp({ 0x48, 0x8D, 0x64, 0x24, 0x08 });
+const std::vector<uint8_t> UHookRelativeIntermediate::RSPDown({ 0x48, 0x8D, 0x64, 0x24, 0xf8 });
