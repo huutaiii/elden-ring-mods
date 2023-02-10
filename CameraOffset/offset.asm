@@ -2,6 +2,7 @@
 ; in
 extern CameraOffset : xmmword
 extern CollisionOffset : xmmword
+extern RetractCollisionOffset : xmmword
 
 .data
 	iCollision byte 0
@@ -13,16 +14,33 @@ extern CollisionOffset : xmmword
 	SetCameraOffset endp
 
 	SetCollisionOffset proc
-
-		; skip until every 3rd call
-		;inc [iCollision]
-		;cmp [iCollision], 3
-		;jl return
-
-		;mov [iCollision], 0
 		addps xmm0, [CollisionOffset]
-		movaps [rsp+58h], xmm0
-	return:
 		ret
 	SetCollisionOffset endp
+
+	SetCollisionOffsetAlt proc
+		;addps xmm0, [CollisionOffset]
+		xorps xmm0, xmm0
+		ret
+	SetCollisionOffsetAlt endp
+
+	SetCollisionOffsetAlt1 proc
+		addps xmm6, [RetractCollisionOffset]
+		ret
+	SetCollisionOffsetAlt1 endp
+
+	AdjustCollision1 proc
+		subps xmm2, [CollisionOffset]
+		ret
+	AdjustCollision1 endp
+
+	AdjustCollision proc
+		subps xmm2, [CollisionOffset]
+		ret
+	AdjustCollision endp
+
+	AdjustCollision01 proc
+		;subps xmm3, [CollisionOffset]
+		ret
+	AdjustCollision01 endp
 end

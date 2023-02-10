@@ -49,7 +49,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
     // fix the hud
     {
         std::vector<uint16_t> pattern = { 0xE8, MASK, MASK, MASK, MASK, 0x88, 0x44, MASK, MASK, 0x4D, 0x8D, MASK, MASK, MASK, MASK, MASK, 0x4D, 0x85, MASK, 0x0F, 0x84, MASK, MASK, MASK, MASK, 0x49, 0x8B, MASK, 0xE8 };
-        uintptr_t address = ModUtils::SigScan(pattern, false, "", true);
+        uintptr_t address = ModUtils::SigScan(pattern, "", true);
         if (address)
         {
             ModUtils::MemSet(address, 0x90, 5);

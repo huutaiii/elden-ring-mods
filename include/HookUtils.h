@@ -204,7 +204,7 @@ private:
 
     inline void UHookRelativeIntermediate_Internal(std::vector<uint16_t> pattern, int offset, uintptr_t *pReturnAddress)
     {
-        lpHook = reinterpret_cast<LPVOID>(ModUtils::SigScan(pattern, false, msg, true) + offset);
+        lpHook = reinterpret_cast<LPVOID>(ModUtils::SigScan(pattern, msg, true) + offset);
         bCanHook = lpHook != nullptr;
         bUseCall = pReturnAddress == nullptr;
         if (!bUseCall)

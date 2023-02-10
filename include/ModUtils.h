@@ -24,7 +24,9 @@ namespace ModUtils
 	static constexpr unsigned char HK_NONE = 0x07;
 
 	static struct {
+		bool bLogProcess = false;
 		bool bScanAllModules = false;
+		bool bLogSkippedRegions = false;
 	} settings;
 
 	class Timer
@@ -189,11 +191,11 @@ namespace ModUtils
 	//      .high = reverse bit mask (0: compare, 1: ignore)
 	// e.g. pattern[2] = 0xf025 : compare current byte's high 4 bits with 0x25's high 4 bits
 	//      pattern[i] = 0xff00..0xffff : skip that byte and check the next ones
-	inline uintptr_t SigScan(std::vector<uint16_t> pattern, bool logProcess = false, std::string msg = {}, bool failSilently = false)
+	inline uintptr_t SigScan(std::vector<uint16_t> pattern, std::string msg = {}, bool failSilently = false)
 	{
 		DWORD processId = GetCurrentProcessId();
 		uintptr_t regionStart = GetProcessBaseAddress(processId);
-		if (logProcess)
+		if (settings.bLogProcess)
 		{
 			Log("Process name: %s", GetModuleName(false).c_str());
 			Log("Process ID: %i", processId);
@@ -207,11 +209,11 @@ namespace ModUtils
 			std::string byte = "";
 			if (bytes > 0xff)
 			{
-				byte = "?";
+				byte = "??";
 			}
 			else
 			{
-				stream << "0x" << std::hex << bytes;
+				stream << std::hex << bytes;
 				byte = stream.str();
 			}
 			patternString.append(byte + " ");
@@ -280,7 +282,7 @@ namespace ModUtils
 					}
 				}
 			}
-			else
+			else if (settings.bLogSkippedRegions)
 			{
 				Log("Skipped region: %p %s", regionStart, moduleName);
 			}

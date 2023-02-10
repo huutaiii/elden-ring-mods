@@ -1,4 +1,6 @@
 
+(1.07)
+
 eldenring.exe.text+3B276D - 23 B8 01405741        - and edi,[rax+41574001]
 eldenring.exe.text+3B2773 - 56                    - push rsi
 eldenring.exe.text+3B2774 - 48 81 EC 28010000     - sub rsp,00000128
@@ -30,10 +32,10 @@ eldenring.exe.text+3B27FB - E8 201BA701           - call eldenring.exe.text+1E24
 eldenring.exe.text+3B2800 - 48 8B 05 D1C38903     - mov rax,[eldenring.exe+3C4FBD8]
 eldenring.exe.text+3B2807 - 48 8B 68 10           - mov rbp,[rax+10]
 
-
+(called 3 times per frame)
 eldenring.exe.text+BFC5B0 - 4C 8B DC              - mov r11,rsp
 eldenring.exe.text+BFC5B3 - 48 81 EC 88000000     - sub rsp,00000088
-eldenring.exe.text+BFC5BA - 41 0F28 01            - movaps xmm0,[r9]
+eldenring.exe.text+BFC5BA - 41 0F28 01            - movaps xmm0,[r9]							; local camera position. 1st call: has collision & custom offset, 2nd: no collision & no offset, 3rd: has collision & no offset
 eldenring.exe.text+BFC5BE - 4D 8D 4B B8           - lea r9,[r11-48]
 eldenring.exe.text+BFC5C2 - 41 0F28 08            - movaps xmm1,[r8]
 eldenring.exe.text+BFC5C6 - 4D 8D 43 C8           - lea r8,[r11-38]

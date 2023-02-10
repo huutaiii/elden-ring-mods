@@ -20,8 +20,10 @@ std::vector<uint8_t> UTF16ToAOB(std::u16string s16)
 
 DWORD WINAPI MainThread(LPVOID params)
 {
+    ModUtils::settings.bLogProcess = true;
+
     std::vector<uint8_t> pattern = UTF16ToAOB(std::u16string(SHADER_NAME));
-    uintptr_t address = ModUtils::SigScan(std::vector<uint16_t>(pattern.begin(), pattern.end()), true, std::string(pattern.begin(), pattern.end()));
+    uintptr_t address = ModUtils::SigScan(std::vector<uint16_t>(pattern.begin(), pattern.end()), std::string(pattern.begin(), pattern.end()));
     if (address)
     {
         ModUtils::MemSet(address, 0, pattern.size());

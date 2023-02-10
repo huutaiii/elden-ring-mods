@@ -1,0 +1,6 @@
+EldenModLoader > Load delay: 5000
+EldenModLoader > Show terminal: 0
+EldenModLoader > Finding mods...
+EldenModLoader > Load orders:
+EldenModLoader > Loading .dll mods...
+EldenModLoader > Loaded 0 .dll mods
