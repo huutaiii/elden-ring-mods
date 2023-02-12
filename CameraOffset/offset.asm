@@ -3,6 +3,12 @@
 extern CameraOffset : xmmword
 extern CollisionOffset : xmmword
 extern RetractCollisionOffset : xmmword
+extern MaxDistanceInterp : dword
+
+;out
+extern bLastCollisionHit : byte
+extern LastCollisionPos : xmmword
+extern LastCollisionDistNormalized : dword
 
 .data
 	iCollision byte 0
@@ -30,7 +36,15 @@ extern RetractCollisionOffset : xmmword
 	SetCollisionOffsetAlt1 endp
 
 	AdjustCollision1 proc
-		subps xmm2, [CollisionOffset]
+		subps xmm2, [CameraOffset]
+
+		; this only runs when there's collision in current frame
+		mov [bLastCollisionHit], 1
+		movaps [LastCollisionPos], xmm2
+
+		; somehow the value lived through the collision function in xmm5, may not work forever
+		movss [LastCollisionDistNormalized], xmm5
+
 		ret
 	AdjustCollision1 endp
 
@@ -43,4 +57,9 @@ extern RetractCollisionOffset : xmmword
 		;subps xmm3, [CollisionOffset]
 		ret
 	AdjustCollision01 endp
+
+	ClampMaxDistance proc
+		movss xmm0, [MaxDistanceInterp]
+		ret
+	ClampMaxDistance endp
 end

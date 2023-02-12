@@ -21,7 +21,7 @@ struct FModConfig
     glm::vec4 Offset = {};
     float OffsetInterpSpeed = 0;
 };
-FModConfig Config = { {1.f, 0.f, 0.f, 1.f}, 8.f };
+FModConfig Config = { {1.f, 0.f, 0.f, 1.f}, 10.f };
 
 struct FCameraData
 {
@@ -34,7 +34,7 @@ struct FCameraData
     // Final camera position, with offset(?) and collision
     glm::vec4 LocFinal = {};
 
-    // Doesn't always track towards LocFinal
+    // Doesn't always track towards LocFinal, no collision(?)
     glm::vec4 LocFinalInterp = {};
 
     // .x = Pitch, .y = Yaw
@@ -71,11 +71,18 @@ extern "C"
     LPVOID CamBaseAddr;
     float Frametime;
 
+    // world space
+    __m128 LastCollisionPos;
+    bool bLastCollisionHit;
+    float LastCollisionDistNormalized;
+
+
     // out
     __m128 CameraOffset;
     __m128 CollisionOffset;
     __m128 RetractCollisionOffset;
     __m128 TargetOffset;
+    float MaxDistanceInterp;
 
     void GetFrametime();
     void GetCameraData();
@@ -86,6 +93,7 @@ extern "C"
     void AdjustCollision();
     void AdjustCollision01();
     void AdjustCollision1();
+    void ClampMaxDistance();
 }
 
 // Called by asm hook to make sure the pointer is always valid
@@ -102,9 +110,29 @@ extern "C" void CalcCameraOffset()
     glm::vec3 collisionOffset = rotation * Config.Offset;
     glm::vec3 cameraOffsetInterp = InterpToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
     glm::vec3 collisionOffsetInterp = InterpToV(glm::vec3(XMMtoGLM(CollisionOffset)), collisionOffset, Config.OffsetInterpSpeed, Frametime);
-    CameraOffset = GLMtoXMM(cameraOffsetInterp);
     CollisionOffset = GLMtoXMM(collisionOffsetInterp);
     RetractCollisionOffset = GLMtoXMM(collisionOffsetInterp * RetractAlpha);
+
+    //if (!bLastCollisionHit)
+    //{
+    //    LastCollisionDistNormalized = InterpToF(LastCollisionDistNormalized * CameraData.MaxDistance, CameraData.MaxDistance, 1, Frametime) / CameraData.MaxDistance;
+    //}
+    if (bLastCollisionHit)
+    {
+        MaxDistanceInterp = LastCollisionDistNormalized * CameraData.MaxDistance;
+    }
+    //else
+    {
+        MaxDistanceInterp = InterpToF(MaxDistanceInterp, CameraData.MaxDistance, 5.f, Frametime);
+        //MaxDistanceInterp = CameraData.MaxDistance;
+        // printf("%f\n", MaxDistanceInterp);
+    }
+
+    {
+        CameraOffset = GLMtoXMM(cameraOffsetInterp * lerp(MaxDistanceInterp / CameraData.MaxDistance, 1.f, 0.75f));
+    }
+
+    bLastCollisionHit = false;
 }
 
 /*
@@ -192,6 +220,7 @@ eldenring.exe+3B5854 - 84 C0                 - test al,al
 eldenring.exe+3B5856 - 0F84 C3000000         - je eldenring.exe+3B591F
 */
 std::vector<uint16_t> PATTERN_COLLISION_ALT1 = { 0xBA, 0x5B, 0x00, 0x00, 0x00, 0x48, 0x8B, 0xCF, 0x0F, 0x29, 0x75, 0xD0, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, 0xBC, 0x9F, 0x88, 0x00, 0x84, 0xC0, 0x0F, 0x84, 0xC3, 0x00, 0x00, 0x00 };
+// offset camera collision traces' end point
 UHookRelativeIntermediate HookSetCollisionOffsetAlt1(
     "HookCollisionOffsetAlt1",
     PATTERN_COLLISION_ALT1,
@@ -235,6 +264,23 @@ UHookRelativeIntermediate HookCollisionAdjust(
     PATTERN_COLLISION_ADJUST,
     5,
     &AdjustCollision
+);
+
+/*
+eldenring.exe+3B8E88 - 76 0E                 - jna eldenring.exe+3B8E98
+eldenring.exe+3B8E8A - F3 0F10 81 B4010000   - movss xmm0,[rcx+000001B4]
+eldenring.exe+3B8E92 - F3 0F5E C1            - divss xmm0,xmm1
+eldenring.exe+3B8E96 - EB 08                 - jmp eldenring.exe+3B8EA0
+eldenring.exe+3B8E98 - F3 0F10 05 087AE802   - movss xmm0,[eldenring.exe+32408A8]
+eldenring.exe+3B8EA0 - 0FC6 C0 00            - shufps xmm0,xmm0,00
+*/
+std::vector<uint16_t> PATTERN_MAX_DISTANCE_CLAMP = { 0x76, 0x0E, 0xF3, 0x0F, 0x10, 0x81, 0xB4, 0x01, 0x00, 0x00, 0xF3, 0x0F, 0x5E, 0xC1, 0xEB, 0x08, 0xF3, 0x0F, 0x10, 0x05, 0x08, 0x7A, 0xE8, 0x02, 0x0F, 0xC6, 0xC0, 0x00 };
+UHookRelativeIntermediate HookMaxDistanceClamp(
+    "HookMaxDistanceClamp",
+    PATTERN_MAX_DISTANCE_CLAMP,
+    8,
+    &ClampMaxDistance,
+    2
 );
 
 /*
@@ -286,6 +332,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         //&HookCollisionAdjust,
         //&HookCollisionAdjust01,
         &HookCollisionAdjust1,
+        &HookMaxDistanceClamp,
     };
     for (UHookRelativeIntermediate* hook : hooks)
     {
@@ -331,10 +378,12 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         }
         if (ModUtils::CheckHotkey(0x72))
         {
-            for (UHookRelativeIntermediate* hook : hooks)
-            {
-                hook->Toggle();
-            }
+            HookSetCollisionOffsetAlt.Toggle();
+            HookSetCollisionOffsetAlt1.Toggle();
+        }
+        if (ModUtils::CheckHotkey(0x73))
+        {
+            HookCollisionAdjust1.Toggle();
         }
         //if (ModUtils::CheckHotkey(0x73))
         //{

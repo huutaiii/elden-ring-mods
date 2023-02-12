@@ -45,7 +45,7 @@ template<typename T>
 inline T saturate(T x) { return clamp(x, T(0), T(1)); }
 
 template<typename Tv, typename Ta>
-inline Tv lerp(Tv x, Tv y, Ta a) { a = clamp(a); return x * ((Ta)1.0 - a) + y * a; }
+inline Tv lerp(Tv x, Tv y, Ta a) { a = clamp(a, Ta(0), Ta(1)); return x * ((Ta)1.0 - a) + y * a; }
 
 template<typename T>
 inline T smoothstep(T edge0, T edge1, T x) {
