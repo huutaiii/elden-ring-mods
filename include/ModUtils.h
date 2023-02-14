@@ -6,6 +6,7 @@
 #include <fileapi.h>
 #include <Psapi.h>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <xinput.h>
 #include <sstream>
@@ -213,7 +214,7 @@ namespace ModUtils
 			}
 			else
 			{
-				stream << std::hex << bytes;
+				stream << std::setfill('0') << std::setw(2) << std::hex << bytes;
 				byte = stream.str();
 			}
 			patternString.append(byte + " ");

@@ -25,13 +25,15 @@ FModConfig Config = { {1.f, 0.f, 0.f, 1.f}, 10.f };
 
 struct FCameraData
 {
+    LPVOID BaseAddress = nullptr;
+
     // Pivot position (uninterpolated)
     glm::vec4 LocPivot = {};
 
     // Pivot position (interpolated)
     glm::vec4 LocPivotInterp = {};
 
-    // Final camera position, with offset(?) and collision
+    // Final camera position, with offset(?) and collision(?)
     glm::vec4 LocFinal = {};
 
     // Doesn't always track towards LocFinal, no collision(?)
@@ -45,7 +47,9 @@ struct FCameraData
 
     float MaxDistance = 0;
 
-    FCameraData(LPVOID BaseAddr = nullptr)
+    bool bIsLockedOn = false;
+
+    FCameraData(LPVOID BaseAddr = nullptr) : BaseAddress(BaseAddr)
     {
         if (BaseAddr)
         {
@@ -59,6 +63,7 @@ struct FCameraData
             LocTarget = MemToGLM(baseAddr + 0x2F0);
             // .x = distance with collision but lower?, .y and .z each has a slightly different interpolation speed, no collision
             MaxDistance = MemToGLM(baseAddr + 0x1B0).z;
+            bIsLockedOn = (*(char*)(baseAddr + 0x49B) & 0x01) != 0;
         }
     }
 
@@ -94,6 +99,7 @@ extern "C"
     void AdjustCollision01();
     void AdjustCollision1();
     void ClampMaxDistance();
+    void SetTargetOffset();
 }
 
 // Called by asm hook to make sure the pointer is always valid
@@ -104,10 +110,25 @@ extern "C" void ReadCameraData()
 
 extern "C" void CalcCameraOffset()
 {
+    {
+        static unsigned long FC = 0;
+        ++FC;
+    }
+
     glm::mat4 rotation = glm::rotateNormalizedAxis(glm::mat4(1), CameraData.Rotation.y, glm::vec3(0, 1, 0));
     float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
     glm::vec3 cameraOffset = rotation * Config.Offset;
     glm::vec3 collisionOffset = rotation * Config.Offset;
+
+    // clamp offset when locked on to avoid the camera spinning around
+    if (CameraData.bIsLockedOn)
+    {
+        //cameraOffset = glm::normalize(cameraOffset) * min(glm::length(cameraOffset), glm::distance(CameraData.LocPivotInterp, CameraData.LocTarget) / 3);
+        float targetDistAdjust = pow(1.f - 1 / exp(glm::distance(CameraData.LocPivotInterp, CameraData.LocTarget)), 2);
+        cameraOffset *= targetDistAdjust;
+        collisionOffset *= targetDistAdjust;
+    }
+
     glm::vec3 cameraOffsetInterp = InterpToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
     glm::vec3 collisionOffsetInterp = InterpToV(glm::vec3(XMMtoGLM(CollisionOffset)), collisionOffset, Config.OffsetInterpSpeed, Frametime);
     CollisionOffset = GLMtoXMM(collisionOffsetInterp);
@@ -302,6 +323,23 @@ UHookRelativeIntermediate HookCollisionAdjust01(
 );
 
 /*
+eldenring.exe+3B7DE9 - 0F28 99 F0020000      - movaps xmm3,[rcx+000002F0]
+eldenring.exe+3B7DF0 - 0F28 A1 E0000000      - movaps xmm4,[rcx+000000E0]
+eldenring.exe+3B7DF7 - 44 0F28 CB            - movaps xmm9,xmm3
+eldenring.exe+3B7DFB - 44 0F5C CC            - subps xmm9,xmm4
+eldenring.exe+3B7DFF - 66 44 0F7F 8D A0000000  - movdqa [rbp+000000A0],xmm9
+eldenring.exe+3B7E08 - 66 44 0F7F 8D 90000000  - movdqa [rbp+00000090],xmm9
+*/
+std::vector<uint16_t> PATTERN_TARGET_OFFSET = { 0x0F, 0x28, 0x99, 0xF0, 0x02, 0x00, 0x00, 0x0F, 0x28, 0xA1, 0xE0, 0x00, 0x00, 0x00, 0x44, 0x0F, 0x28, 0xCB, 0x44, 0x0F, 0x5C, 0xCC, 0x66, 0x44, 0x0F, 0x7F, 0x8D, 0xA0, 0x00, 0x00, 0x00, 0x66, 0x44, 0x0F, 0x7F, 0x8D, 0x90, 0x00, 0x00, 0x00 };
+UHookRelativeIntermediate HookTargetOffset(
+    "HookTargetOffset",
+    PATTERN_TARGET_OFFSET,
+    8,
+    &SetTargetOffset,
+    14
+);
+
+/*
 eldenring.exe.text+D89AD8 - F3 0F11 49 04         - movss [rcx+04],xmm1
 eldenring.exe.text+D89ADD - F3 0F58 09            - addss xmm1,[rcx]
 eldenring.exe.text+D89AE1 - 0F2F C8               - comiss xmm1,xmm0
@@ -333,6 +371,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         //&HookCollisionAdjust01,
         &HookCollisionAdjust1,
         &HookMaxDistanceClamp,
+        &HookTargetOffset,
     };
     for (UHookRelativeIntermediate* hook : hooks)
     {

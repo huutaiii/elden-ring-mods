@@ -62,4 +62,9 @@ extern LastCollisionDistNormalized : dword
 		movss xmm0, [MaxDistanceInterp]
 		ret
 	ClampMaxDistance endp
+
+	SetTargetOffset proc
+		subps xmm9, [CameraOffset]
+		ret
+	SetTargetOffset endp
 end
