@@ -10,6 +10,10 @@ extern bLastCollisionHit : byte
 extern LastCollisionPos : xmmword
 extern LastCollisionDistNormalized : dword
 
+extern TargetViewOffset : xmmword
+extern TargetViewMaxOffsetSqr : dword
+extern TargetViewMaxOffsetMul : dword
+
 .data
 	iCollision byte 0
 
@@ -67,4 +71,11 @@ extern LastCollisionDistNormalized : dword
 		subps xmm9, [CameraOffset]
 		ret
 	SetTargetOffset endp
+
+	GetTargetViewOffset proc
+		mulss xmm13, [TargetViewMaxOffsetMul]
+		movss [TargetViewMaxOffsetSqr], xmm13
+		movaps [TargetViewOffset], xmm6
+		ret
+	GetTargetViewOffset endp
 end

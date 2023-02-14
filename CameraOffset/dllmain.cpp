@@ -18,10 +18,12 @@ using ModUtils::MASK;
 
 struct FModConfig
 {
-    glm::vec4 Offset = {};
+    glm::vec3 Offset = {};
+    glm::vec3 OffsetLockon = {};
     float OffsetInterpSpeed = 0;
+    float TargetViewOffsetMul = 1.f;
 };
-FModConfig Config = { {1.f, 0.f, 0.f, 1.f}, 10.f };
+FModConfig Config = { {1.f, 0.f, 0.f}, {1.5f, 0.f, 0.f}, 10.f, 2.5f };
 
 struct FCameraData
 {
@@ -100,6 +102,11 @@ extern "C"
     void AdjustCollision1();
     void ClampMaxDistance();
     void SetTargetOffset();
+
+    void GetTargetViewOffset();
+    __m128 TargetViewOffset;
+    float TargetViewMaxOffsetSqr;
+    float TargetViewMaxOffsetMul;
 }
 
 // Called by asm hook to make sure the pointer is always valid
@@ -108,6 +115,9 @@ extern "C" void ReadCameraData()
     CameraData = FCameraData(CamBaseAddr);
 }
 
+float LockonAlpha = 0.f;
+float SideSwitch = 1.f;
+
 extern "C" void CalcCameraOffset()
 {
     {
@@ -115,10 +125,27 @@ extern "C" void CalcCameraOffset()
         ++FC;
     }
 
+    TargetViewMaxOffsetMul = Config.TargetViewOffsetMul;
+
+    LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, 1.f, Frametime);
+    if (CameraData.bIsLockedOn)
+    {
+
+        //printf("%f %s\n", TargetViewMaxOffsetSqr, glm::to_string(XMMtoGLM(TargetViewOffset)).c_str());
+        float ViewOffsetY = XMMtoGLM(TargetViewOffset).y;
+        float ViewOffsetClamped = clamp(ViewOffsetY / (TargetViewMaxOffsetSqr), -1.f, 1.f);
+        SideSwitch = InterpToF(SideSwitch, ViewOffsetClamped, 2.5f, Frametime);
+        //SideSwitch = InterpToF(SideSwitch, ViewOffsetY > 0.f ? 1.f : -1.f, 1.f, Frametime);
+    }
+    else
+    {
+        SideSwitch = 1.f;
+    }
+
     glm::mat4 rotation = glm::rotateNormalizedAxis(glm::mat4(1), CameraData.Rotation.y, glm::vec3(0, 1, 0));
     float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
-    glm::vec3 cameraOffset = rotation * Config.Offset;
-    glm::vec3 collisionOffset = rotation * Config.Offset;
+    glm::vec3 cameraOffset = rotation * glm::vec4(lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 0, 0), 1);
+    glm::vec3 collisionOffset = cameraOffset;
 
     // clamp offset when locked on to avoid the camera spinning around
     if (CameraData.bIsLockedOn)
@@ -340,6 +367,24 @@ UHookRelativeIntermediate HookTargetOffset(
 );
 
 /*
+eldenring.exe+3B8A10 - F3 44 0F10 AE E0020000  - movss xmm13,[rsi+000002E0]
+eldenring.exe+3B8A19 - 41 0F28 E5            - movaps xmm4,xmm13
+eldenring.exe+3B8A1D - F3 41 0F59 E5         - mulss xmm4,xmm13
+eldenring.exe+3B8A22 - 0F2F E5               - comiss xmm4,xmm5
+eldenring.exe+3B8A25 - 76 0D                 - jna eldenring.exe+3B8A34
+eldenring.exe+3B8A27 - 44 0F29 8E 50010000   - movaps [rsi+00000150],xmm9
+eldenring.exe+3B8A2F - E9 A8010000           - jmp eldenring.exe+3B8BDC
+*/
+std::vector<uint16_t> PATTERN_TARGET_VIEW_OFFSET = { 0xF3, 0x44, 0x0F, 0x10, 0xAE, 0xE0, 0x02, 0x00, 0x00, 0x41, 0x0F, 0x28, 0xE5, 0xF3, 0x41, 0x0F, 0x59, 0xE5, 0x0F, 0x2F, 0xE5, 0x76, 0x0D, 0x44, 0x0F, 0x29, 0x8E, 0x50, 0x01, 0x00, 0x00, 0xE9, 0xA8, 0x01, 0x00, 0x00 };
+UHookRelativeIntermediate HookTargetViewOffset(
+    "HookTargetViewOffset",
+    PATTERN_TARGET_VIEW_OFFSET,
+    9,
+    &GetTargetViewOffset,
+    0
+);
+
+/*
 eldenring.exe.text+D89AD8 - F3 0F11 49 04         - movss [rcx+04],xmm1
 eldenring.exe.text+D89ADD - F3 0F58 09            - addss xmm1,[rcx]
 eldenring.exe.text+D89AE1 - 0F2F C8               - comiss xmm1,xmm0
@@ -372,6 +417,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         &HookCollisionAdjust1,
         &HookMaxDistanceClamp,
         &HookTargetOffset,
+        &HookTargetViewOffset,
     };
     for (UHookRelativeIntermediate* hook : hooks)
     {
@@ -411,18 +457,14 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         }
         if (ModUtils::CheckHotkey(0x71))
         {
-            HookSetCameraOffset.Toggle();
-            HookGetFrametime.Toggle();
-            HookGetCameraData.Toggle();
+            for (UHookRelativeIntermediate* pHook : hooks)
+            {
+                pHook->Toggle();
+            }
         }
         if (ModUtils::CheckHotkey(0x72))
         {
-            HookSetCollisionOffsetAlt.Toggle();
-            HookSetCollisionOffsetAlt1.Toggle();
-        }
-        if (ModUtils::CheckHotkey(0x73))
-        {
-            HookCollisionAdjust1.Toggle();
+            SideSwitch = -SideSwitch;
         }
         //if (ModUtils::CheckHotkey(0x73))
         //{
