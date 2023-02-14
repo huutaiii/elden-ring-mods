@@ -23,7 +23,7 @@ struct FModConfig
     float OffsetInterpSpeed = 0;
     float TargetViewOffsetMul = 1.f;
 };
-FModConfig Config = { {1.f, 0.f, 0.f}, {1.5f, 0.f, 0.f}, 10.f, 2.5f };
+FModConfig Config = { {.75f, 0.f, 0.f}, {1.2f, 0.f, 0.f}, 10.f, 2.f };
 
 struct FCameraData
 {
@@ -105,7 +105,7 @@ extern "C"
 
     void GetTargetViewOffset();
     __m128 TargetViewOffset;
-    float TargetViewMaxOffsetSqr;
+    float TargetViewMaxOffset;
     float TargetViewMaxOffsetMul;
 }
 
@@ -127,19 +127,20 @@ extern "C" void CalcCameraOffset()
 
     TargetViewMaxOffsetMul = Config.TargetViewOffsetMul;
 
-    LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, 1.f, Frametime);
+    LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, CameraData.bIsLockedOn ? 1.f : 0.667f, Frametime);
     if (CameraData.bIsLockedOn)
     {
 
         //printf("%f %s\n", TargetViewMaxOffsetSqr, glm::to_string(XMMtoGLM(TargetViewOffset)).c_str());
         float ViewOffsetY = XMMtoGLM(TargetViewOffset).y;
-        float ViewOffsetClamped = clamp(ViewOffsetY / (TargetViewMaxOffsetSqr), -1.f, 1.f);
+        int sign = ViewOffsetY > 0.f ? 1 : -1;
+        float ViewOffsetClamped = clamp(sign * sqrt(abs(ViewOffsetY / TargetViewMaxOffset)), -1.f, 1.f);
         SideSwitch = InterpToF(SideSwitch, ViewOffsetClamped, 2.5f, Frametime);
         //SideSwitch = InterpToF(SideSwitch, ViewOffsetY > 0.f ? 1.f : -1.f, 1.f, Frametime);
     }
     else
     {
-        SideSwitch = 1.f;
+        SideSwitch = InterpToF(SideSwitch, 1.f, 1.f, Frametime);
     }
 
     glm::mat4 rotation = glm::rotateNormalizedAxis(glm::mat4(1), CameraData.Rotation.y, glm::vec3(0, 1, 0));

@@ -11,7 +11,7 @@ extern LastCollisionPos : xmmword
 extern LastCollisionDistNormalized : dword
 
 extern TargetViewOffset : xmmword
-extern TargetViewMaxOffsetSqr : dword
+extern TargetViewMaxOffset : dword
 extern TargetViewMaxOffsetMul : dword
 
 .data
@@ -74,7 +74,7 @@ extern TargetViewMaxOffsetMul : dword
 
 	GetTargetViewOffset proc
 		mulss xmm13, [TargetViewMaxOffsetMul]
-		movss [TargetViewMaxOffsetSqr], xmm13
+		movss [TargetViewMaxOffset], xmm13
 		movaps [TargetViewOffset], xmm6
 		ret
 	GetTargetViewOffset endp
