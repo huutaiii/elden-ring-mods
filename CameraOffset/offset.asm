@@ -23,6 +23,11 @@ extern TargetViewMaxOffsetMul : dword
 		ret
 	SetCameraOffset endp
 
+	AddCameraOffsetAlt proc
+		addps xmm1, [CameraOffset]
+		ret
+	AddCameraOffsetAlt endp
+
 	SetCollisionOffset proc
 		addps xmm0, [CollisionOffset]
 		ret

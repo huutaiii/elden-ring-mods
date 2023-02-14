@@ -94,6 +94,7 @@ extern "C"
     void GetFrametime();
     void GetCameraData();
     void SetCameraOffset();
+    void AddCameraOffsetAlt();
     void SetCollisionOffset();
     void SetCollisionOffsetAlt();
     void SetCollisionOffsetAlt1();
@@ -134,7 +135,11 @@ extern "C" void CalcCameraOffset()
         //printf("%f %s\n", TargetViewMaxOffsetSqr, glm::to_string(XMMtoGLM(TargetViewOffset)).c_str());
         float ViewOffsetY = XMMtoGLM(TargetViewOffset).y;
         float ViewOffsetClamped = clamp(ViewOffsetY / (TargetViewMaxOffsetSqr), -1.f, 1.f);
-        SideSwitch = InterpToF(SideSwitch, ViewOffsetClamped, 2.5f, Frametime);
+        float d = InterpToF(SideSwitch, ViewOffsetClamped > 0.f ? 1.f : -1.f, 10.f, Frametime) - SideSwitch;
+
+        //printf("%f %f %f\n", ViewOffsetY, SideSwitch, d);
+
+        SideSwitch += d;
         //SideSwitch = InterpToF(SideSwitch, ViewOffsetY > 0.f ? 1.f : -1.f, 1.f, Frametime);
     }
     else
@@ -218,6 +223,33 @@ UHookRelativeIntermediate HookSetCameraOffset(
     PATTERN_CAMERA_OFFSET,
     7,
     &SetCameraOffset
+);
+
+/*
+eldenring.exe+3B96B6 - 41 0F29 40 30         - movaps [r8+30],xmm0
+eldenring.exe+3B96BB - 0F28 4A 40            - movaps xmm1,[rdx+40]
+eldenring.exe+3B96BF - 41 0F29 48 40         - movaps [r8+40],xmm1
+eldenring.exe+3B96C4 - 83 49 28 01           - or dword ptr [rcx+28],01
+eldenring.exe+3B96C8 - C3                    - ret
+eldenring.exe+3B96C9 - 8B D3                 - mov edx,ebx
+eldenring.exe+3B96CB - E9 45770B01           - jmp eldenring.exe+1470E15
+eldenring.exe+3B96D0 - 48 83 EC 38           - sub rsp,38
+eldenring.exe+3B96D4 - 0F29 74 24 20         - movaps [rsp+20],xmm6
+eldenring.exe+3B96D9 - 48 8B 05 B0808103     - mov rax,[eldenring.exe+3BD1790]
+eldenring.exe+3B96E0 - 48 33 C4              - xor rax,rsp
+eldenring.exe+3B96E3 - 48 89 44 24 10        - mov [rsp+10],rax
+eldenring.exe+3B96E8 - 0F28 02               - movaps xmm0,[rdx]
+eldenring.exe+3B96EB - 48 8B 41 08           - mov rax,[rcx+08]
+eldenring.exe+3B96EF - 66 0F7F 04 24         - movdqa [rsp],xmm0
+eldenring.exe+3B96F4 - C7 44 24 0C 00000000  - mov [rsp+0C],00000000
+
+*/
+std::vector<uint16_t> PATTERN_CAMERA_OFFSET_ALT = { 0x41, 0x0F, 0x29, 0x40, 0x30, 0x0F, 0x28, 0x4A, 0x40, 0x41, 0x0F, 0x29, 0x48, 0x40, 0x83, 0x49, 0x28, 0x01, 0xC3, 0x8B, 0xD3, 0xE9, 0x45, 0x77, 0x0B, 0x01, 0x48, 0x83, 0xEC, 0x38, 0x0F, 0x29, 0x74, 0x24, 0x20, 0x48, 0x8B, 0x05, 0xB0, 0x80, 0x81, 0x03, 0x48, 0x33, 0xC4, 0x48, 0x89, 0x44, 0x24, 0x10, 0x0F, 0x28, 0x02, 0x48, 0x8B, 0x41, 0x08, 0x66, 0x0F, 0x7F, 0x04, 0x24, 0xC7, 0x44, 0x24, 0x0C, 0x00, 0x00, 0x00, 0x00 };
+UHookRelativeIntermediate HookAddCameraOffsetAlt(
+    "HookAddCameraOffsetAlt",
+    PATTERN_CAMERA_OFFSET_ALT,
+    9,
+    &AddCameraOffsetAlt
 );
 
 /*
@@ -409,7 +441,8 @@ DWORD WINAPI MainThread(LPVOID lpParam)
     std::vector<UHookRelativeIntermediate*> hooks {
         &HookGetFrametime,
         &HookGetCameraData,
-        &HookSetCameraOffset,
+        //&HookSetCameraOffset,
+        &HookAddCameraOffsetAlt,
         &HookSetCollisionOffsetAlt,
         &HookSetCollisionOffsetAlt1,
         //&HookCollisionAdjust,
