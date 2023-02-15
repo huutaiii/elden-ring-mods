@@ -5,6 +5,8 @@ extern CalcCameraOffset : proto
 extern CamBaseAddr : qword
 extern Frametime : dword
 
+extern bIsTalking : byte
+
 .code
 	GetCameraData proc
 
@@ -32,4 +34,20 @@ extern Frametime : dword
 		movss [Frametime], xmm1
 		ret
 	GetFrametime endp
+
+	GetNPCState proc
+		test rdi, rdi
+		je GetNPCState_return
+		push rax
+		xor al, al
+		mov al, [rsi+28h]
+		and al, 20h
+		cmp al, 0
+		setz al
+		mov [bIsTalking], al
+		pop rax
+
+	GetNPCState_return:
+		ret
+	GetNPCState endp
 end

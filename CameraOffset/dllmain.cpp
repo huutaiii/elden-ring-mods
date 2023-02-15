@@ -16,6 +16,10 @@
 
 using ModUtils::MASK;
 
+constexpr unsigned int ID_NPC_INTERACT = 1000000;
+constexpr unsigned int ID_GRACE = 1001000;
+constexpr unsigned int ID_GRACE_TABLE = 1001001;
+
 struct FModConfig
 {
     glm::vec3 Offset = {};
@@ -51,6 +55,8 @@ struct FCameraData
 
     bool bIsLockedOn = false;
 
+    uint32_t ParamID = 0;
+
     FCameraData(LPVOID BaseAddr = nullptr) : BaseAddress(BaseAddr)
     {
         if (BaseAddr)
@@ -66,6 +72,7 @@ struct FCameraData
             // .x = distance with collision but lower?, .y and .z each has a slightly different interpolation speed, no collision
             MaxDistance = MemToGLM(baseAddr + 0x1B0).z;
             bIsLockedOn = (*(char*)(baseAddr + 0x49B) & 0x01) != 0;
+            ParamID = *(uint32_t*)(baseAddr + 0x460);
         }
     }
 
@@ -82,6 +89,8 @@ extern "C"
     __m128 LastCollisionPos;
     bool bLastCollisionHit;
     float LastCollisionDistNormalized;
+
+    uint8_t bIsTalking = 0;
 
 
     // out
@@ -107,6 +116,8 @@ extern "C"
     __m128 TargetViewOffset;
     float TargetViewMaxOffset;
     float TargetViewMaxOffsetMul;
+
+    void GetNPCState();
 }
 
 // Called by asm hook to make sure the pointer is always valid
@@ -117,6 +128,7 @@ extern "C" void ReadCameraData()
 
 float LockonAlpha = 0.f;
 float SideSwitch = 1.f;
+float ToggleAlpha = 1.f;
 
 extern "C" void CalcCameraOffset()
 {
@@ -143,9 +155,18 @@ extern "C" void CalcCameraOffset()
         SideSwitch = InterpToF(SideSwitch, 1.f, 1.f, Frametime);
     }
 
+    bool bIsResting = CameraData.ParamID == ID_GRACE || CameraData.ParamID == ID_GRACE_TABLE;
+    // some NPCs don't trigger the zoom-in so this doesn't always work
+    bool bIsTalking = CameraData.ParamID == ID_NPC_INTERACT;
+
+    bool bUseOffset = !bIsTalking && !bIsResting;
+    ToggleAlpha = InterpToF(ToggleAlpha, bUseOffset ? 1.f : 0.f, 2.f, Frametime);
+
+    glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * ToggleAlpha;
+
     glm::mat4 rotation = glm::rotateNormalizedAxis(glm::mat4(1), CameraData.Rotation.y, glm::vec3(0, 1, 0));
     float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
-    glm::vec3 cameraOffset = rotation * glm::vec4(lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 0, 0), 1);
+    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 0, 0), 1);
     glm::vec3 collisionOffset = cameraOffset;
 
     // clamp offset when locked on to avoid the camera spinning around
@@ -386,6 +407,27 @@ UHookRelativeIntermediate HookTargetViewOffset(
 );
 
 /*
+eldenring.exe+203DFA2 - 41 8B D4              - mov edx,r12d
+eldenring.exe+203DFA5 - FF 50 28              - call qword ptr [rax+28]
+eldenring.exe+203DFA8 - 4C 8D 44 24 40        - lea r8,[rsp+40]
+eldenring.exe+203DFAD - 48 8B D6              - mov rdx,rsi
+eldenring.exe+203DFB0 - 48 8B 4E 20           - mov rcx,[rsi+20]
+eldenring.exe+203DFB4 - E8 F7120000           - call eldenring.exe+203F2B0
+eldenring.exe+203DFB9 - 48 8B E8              - mov rbp,rax
+eldenring.exe+203DFBC - 48 85 C0              - test rax,rax
+eldenring.exe+203DFBF - 0F84 8A000000         - je eldenring.exe+203E04F
+eldenring.exe+203DFC5 - 48 8B BE 80000000     - mov rdi,[rsi+00000080]
+*/
+std::vector<uint16_t> PATTERN_NPC_STATE = { 0x41, 0x8B, 0xD4, 0xFF, 0x50, 0x28, 0x4C, 0x8D, 0x44, 0x24, 0x40, 0x48, 0x8B, 0xD6, 0x48, 0x8B, 0x4E, 0x20, 0xE8, 0xF7, 0x12, 0x00, 0x00, 0x48, 0x8B, 0xE8, 0x48, 0x85, 0xC0, 0x0F, 0x84, 0x8A, 0x00, 0x00, 0x00, 0x48, 0x8B, 0xBE, 0x80, 0x00, 0x00, 0x00 };
+UHookRelativeIntermediate HookNPCState(
+    "HookNPCState",
+    PATTERN_NPC_STATE,
+    7,
+    &GetNPCState,
+    35
+);
+
+/*
 eldenring.exe.text+D89AD8 - F3 0F11 49 04         - movss [rcx+04],xmm1
 eldenring.exe.text+D89ADD - F3 0F58 09            - addss xmm1,[rcx]
 eldenring.exe.text+D89AE1 - 0F2F C8               - comiss xmm1,xmm0
@@ -419,6 +461,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         &HookMaxDistanceClamp,
         &HookTargetOffset,
         &HookTargetViewOffset,
+        //&HookNPCState,
     };
     for (UHookRelativeIntermediate* hook : hooks)
     {
@@ -448,13 +491,14 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
+            printf("ParamID = %d\n", CameraData.ParamID);
             //printf("%s\n", glm::to_string(CameraData.DirForward).c_str());
-            printf("LocFinal = %s\n", glm::to_string(CameraData.LocFinal).c_str());
-            printf("LocPivot = %s\n", glm::to_string(CameraData.LocPivot).c_str());
-            printf("LocPivotInterp = %s\n", glm::to_string(CameraData.LocPivotInterp).c_str());
-            printf("LocTarget = %s\n", glm::to_string(CameraData.LocTarget).c_str());
-            printf("Rotation = %s\n", glm::to_string(CameraData.Rotation).c_str());
-            printf("%f %f\n", CameraData.MaxDistance, saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance));
+            //printf("LocFinal = %s\n", glm::to_string(CameraData.LocFinal).c_str());
+            //printf("LocPivot = %s\n", glm::to_string(CameraData.LocPivot).c_str());
+            //printf("LocPivotInterp = %s\n", glm::to_string(CameraData.LocPivotInterp).c_str());
+            //printf("LocTarget = %s\n", glm::to_string(CameraData.LocTarget).c_str());
+            //printf("Rotation = %s\n", glm::to_string(CameraData.Rotation).c_str());
+            //printf("%f %f\n", CameraData.MaxDistance, saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance));
         }
         if (ModUtils::CheckHotkey(0x71))
         {
