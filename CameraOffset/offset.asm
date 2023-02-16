@@ -4,6 +4,7 @@ extern CameraOffset : xmmword
 extern CollisionOffset : xmmword
 extern RetractCollisionOffset : xmmword
 extern MaxDistanceInterp : dword
+extern TargetOffset : xmmword
 
 ;out
 extern bLastCollisionHit : byte
@@ -69,6 +70,7 @@ extern TargetViewMaxOffsetMul : dword
 
 	SetTargetOffset proc
 		subps xmm9, [CameraOffset]
+		addps xmm9, [TargetOffset]
 		ret
 	SetTargetOffset endp
 

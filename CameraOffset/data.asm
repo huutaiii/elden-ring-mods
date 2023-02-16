@@ -6,6 +6,7 @@ extern CamBaseAddr : qword
 extern Frametime : dword
 
 extern bIsTalking : byte
+extern InteractPtr : qword
 
 .code
 	GetCameraData proc
@@ -50,4 +51,15 @@ extern bIsTalking : byte
 	GetNPCState_return:
 		ret
 	GetNPCState endp
+
+	GetInteractState proc
+		lea rcx, [rsp+8]
+		push rax
+
+		mov rax, [rcx+4D0h]
+		mov [InteractPtr], rax
+
+		pop rax
+		ret
+	GetInteractState endp
 end

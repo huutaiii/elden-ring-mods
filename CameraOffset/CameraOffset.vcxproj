@@ -162,6 +162,8 @@
     <ClInclude Include="..\include\INIReader.h" />
     <ClInclude Include="..\include\MathUtils.h" />
     <ClInclude Include="..\include\ModUtils.h" />
+    <ClInclude Include="Config.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="disasm_cameradata.txt" />
@@ -172,6 +174,12 @@
       <FileType>Document</FileType>
     </MASM>
     <MASM Include="offset.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="CameraOffset.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="config.ini" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

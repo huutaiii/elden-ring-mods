@@ -46,6 +46,10 @@ https://github.com/benhoyt/inih
 #ifndef __INI_H__
 #define __INI_H__
 
+#include <algorithm>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 /* Make this header file easier to include in C++ code */
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +60,6 @@ extern "C" {
 #include <vector>
 #include <iterator>
 #include <string>
-#include <algorithm>
 
 /* Typedef for prototype of handler function. */
 typedef int (*ini_handler)(void* user, const char* section,
@@ -389,8 +392,8 @@ public:
     // and valid false values are "false", "no", "off", "0" (not case sensitive).
     bool GetBoolean(const std::string& section, const std::string& name, bool default_value) const;
 
-    template<size_t size, typename T>
-    std::vector<T> GetVector(const std::string& section, const std::string& name, std::vector<T> default_value) const;
+    template<glm::length_t L, typename T, glm::qualifier Q>
+    glm::vec<L, T, Q> GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const;
 
 protected:
     int _error;
@@ -479,8 +482,8 @@ inline bool INIReader::GetBoolean(const std::string& section, const std::string&
         return default_value;
 }
 
-template<size_t size, typename T>
-inline std::vector<T> INIReader::GetVector(const std::string& section, const std::string& name, std::vector<T> default_value) const
+template<glm::length_t L, typename T, glm::qualifier Q>
+inline glm::vec<L, T, Q> INIReader::GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const
 {
     std::string valstr = Get(section, name, "");
     std::replace_if(valstr.begin(), valstr.end(), [](unsigned char c) { return std::string("0123456789.-").find(c) == std::string::npos; }, ' ');
@@ -489,7 +492,13 @@ inline std::vector<T> INIReader::GetVector(const std::string& section, const std
     std::istream_iterator<double> end;
     #pragma warning(suppress:4244)
     std::vector<T> result(iterator, end);
-    return result.size() == size ? result : default_value;
+    if (result.size() == L)
+    {
+        glm::vec<L, T, Q> rvec;
+        memcpy(glm::value_ptr(rvec), result.data(), sizeof(glm::vec<L, T, Q>));
+        return rvec;
+    }
+    return default_value;
 }
 
 inline std::string INIReader::MakeKey(const std::string& section, const std::string& name)
