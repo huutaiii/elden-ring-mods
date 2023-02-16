@@ -486,6 +486,7 @@ template<glm::length_t L, typename T, glm::qualifier Q>
 inline glm::vec<L, T, Q> INIReader::GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const
 {
     std::string valstr = Get(section, name, "");
+    // replace unwanted characters with ' '
     std::replace_if(valstr.begin(), valstr.end(), [](unsigned char c) { return std::string("0123456789.-").find(c) == std::string::npos; }, ' ');
     std::istringstream stream(valstr);
     std::istream_iterator<double> iterator(stream);

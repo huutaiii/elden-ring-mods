@@ -166,7 +166,7 @@ extern "C" void ReadCameraData()
 float LockonAlpha = 0.f;
 float SideSwitch = 1.f;
 float ToggleAlpha = 1.f;
-int EnableOffsetDelay = 1;
+const int EnableOffsetDelay = 2;
 int EnableOffsetElapsed = 0;
 
 extern "C" void CalcCameraOffset()
@@ -220,9 +220,10 @@ extern "C" void CalcCameraOffset()
 
     glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * ToggleAlpha;
 
-    if (CameraData.ParamID == ID_GRACE)
     {
-        localMaxOffset += glm::vec3(-0.5f, 0, 0);
+        static float GraceInterp = 0.f;
+        GraceInterp = InterpToF(GraceInterp, CameraData.ParamID == ID_GRACE ? 1.f : 0.f, 5.f, Frametime);
+        localMaxOffset += glm::vec3(-0.5f, 0, 0) * GraceInterp;
     }
 
     glm::mat4 rotation = glm::rotateNormalizedAxis(glm::mat4(1), CameraData.Rotation.y, glm::vec3(0, 1, 0));
@@ -247,8 +248,8 @@ extern "C" void CalcCameraOffset()
         }
     }
 
-    glm::vec3 cameraOffsetInterp = InterpToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
-    glm::vec3 collisionOffsetInterp = InterpToV(glm::vec3(XMMtoGLM(CollisionOffset)), collisionOffset, Config.OffsetInterpSpeed, Frametime);
+    glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
+    glm::vec3 collisionOffsetInterp = cameraOffsetInterp;
     CollisionOffset = GLMtoXMM(collisionOffsetInterp);
     RetractCollisionOffset = GLMtoXMM(collisionOffsetInterp * RetractAlpha);
 

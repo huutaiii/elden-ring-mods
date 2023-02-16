@@ -90,6 +90,25 @@ inline glm::vec<L, T, Q> InterpToV(glm::vec<L, T, Q> current, glm::vec<L, T, Q> 
     return current + vel;
 }
 
+template<glm::length_t L, typename T, glm::qualifier Q>
+inline glm::vec<L, T, Q> InterpSToV(glm::vec<L, T, Q> current, glm::vec<L, T, Q> target, float speed, float deltaTime, float minDistance = 0.0001f)
+{
+    if (speed <= 0.f)
+    {
+        return target;
+    }
+
+    glm::vec<L, T, Q> delta = (target - current);
+    if (glm::length(delta) <= minDistance)
+    {
+        return target;
+    }
+
+    T deltaL = glm::length(delta);
+    glm::vec<L, T, Q> vel = glm::normalize(delta) * clamp(deltaL * deltaL * deltaTime * speed, 0.f, deltaL);
+    return current + vel;
+}
+
 template <typename T>
 inline T InterpToF(T current, T target, double speed, double deltaTime, double minDistance = 1.0 / 10000)
 {
@@ -105,6 +124,25 @@ inline T InterpToF(T current, T target, double speed, double deltaTime, double m
     }
 
     T deltaInterp = T(delta * saturate(deltaTime * speed));
+    return current + deltaInterp;
+}
+
+template <typename T>
+inline T InterpSToF(T current, T target, double speed, double deltaTime, double minDistance = 1.0 / 10000)
+{
+    if (speed <= 0.00001)
+    {
+        return target;
+    }
+
+    T delta = target - current;
+    if (abs(delta) <= minDistance)
+    {
+        return target;
+    }
+
+    T deltaInterp = T(delta * delta * saturate(deltaTime * speed));
+    deltaInterp = (deltaInterp > 0.f ? 1.f : -1.f) * min(abs(deltaInterp), abs(delta));
     return current + deltaInterp;
 }
 
