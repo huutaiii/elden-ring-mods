@@ -178,7 +178,7 @@ extern "C" void CalcCameraOffset()
 
     TargetViewMaxOffsetMul = Config.TargetViewOffsetMul;
 
-    LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, CameraData.bIsLockedOn ? 3.f : 0.5f, Frametime);
+    LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, CameraData.bIsLockedOn ? 3.f : 2.f, Frametime);
 
     if (Config.bUseSideSwitch)
     {
@@ -205,7 +205,8 @@ extern "C" void CalcCameraOffset()
         //bool bIsTalking = CameraData.ParamID == ID_NPC_INTERACT;
 
         //bool bUseOffset = !bIsTalking && !bIsResting;
-        bool bUseOffset = InteractPtr <= 1;
+        // some interactions don't set the pointer, like getting hugs from Fia
+        bool bUseOffset = !(InteractPtr > 1 || CameraData.ParamID == ID_NPC_INTERACT);
         // delay re-enabling offset so the camera won't jiggle when going between menus
         if (!bUseOffset)
         {
@@ -222,7 +223,7 @@ extern "C" void CalcCameraOffset()
 
     {
         static float GraceInterp = 0.f;
-        GraceInterp = InterpToF(GraceInterp, CameraData.ParamID == ID_GRACE ? 1.f : 0.f, 5.f, Frametime);
+        GraceInterp = InterpToF(GraceInterp, CameraData.ParamID == ID_GRACE ? 1.f : 0.f, 3.f, Frametime);
         localMaxOffset += glm::vec3(-0.5f, 0, 0) * GraceInterp;
     }
 
@@ -231,15 +232,14 @@ extern "C" void CalcCameraOffset()
     glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 0, 0), 1);
     glm::vec3 collisionOffset = cameraOffset;
 
+    static float TargetDistAdjust = 1.f;
     if (CameraData.bIsLockedOn)
     {
         float targetDistance = glm::distance(CameraData.LocPivotInterp, CameraData.LocTarget);
         //glm::vec3 targetOffset = cameraOffset * (0.0625f * (-1.f) * pow(targetDistance > 1.f ? targetDistance : pow(targetDistance, 1 / targetDistance), 1.125f));
 
         // clamp offset when locked on to avoid the camera spinning around
-        float targetDistAdjust = pow(1.f - 1 / exp2(max(targetDistance - .1f, 0.f)), 2);
-        cameraOffset *= targetDistAdjust;
-        collisionOffset *= targetDistAdjust;
+        TargetDistAdjust = pow(1.f - 1 / exp2(max(targetDistance - .1f, 0.f)), 2);
 
         if (Config.bUseTargetOffset)
         {
@@ -247,6 +247,12 @@ extern "C" void CalcCameraOffset()
             TargetOffset = GLMtoXMM(targetOffset);
         }
     }
+    else
+    {
+        TargetDistAdjust = InterpToF(TargetDistAdjust, 1.f, 2.f, Frametime);
+    }
+    cameraOffset *= TargetDistAdjust;
+    collisionOffset *= TargetDistAdjust;
 
     glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
     glm::vec3 collisionOffsetInterp = cameraOffsetInterp;
