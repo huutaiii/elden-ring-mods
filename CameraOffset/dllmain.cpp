@@ -117,8 +117,9 @@ FCameraData CameraData;
 extern "C"
 {
     // in
-    LPVOID CamBaseAddr;
     float Frametime;
+    LPVOID CamBaseAddr;
+    LPVOID CamSettingsPtr;
 
     // world space
     __m128 LastCollisionPos;
@@ -138,6 +139,7 @@ extern "C"
 
     void GetFrametime();
     void GetCameraData();
+    void GetCameraSettings();
     void SetCameraOffset();
     void SetCollisionOffset();
     void SetCollisionOffsetAlt();
@@ -155,6 +157,9 @@ extern "C"
 
     void GetNPCState();
     void GetInteractState();
+    void SetCrit();
+
+    WORD CritAnimElapsed;
 }
 
 // Called by asm hook to make sure the pointer is always valid
@@ -168,6 +173,7 @@ float SideSwitch = 1.f;
 float ToggleAlpha = 1.f;
 const int EnableOffsetDelay = 2;
 int EnableOffsetElapsed = 0;
+const WORD CritAnimDelay = 15;
 
 extern "C" void CalcCameraOffset()
 {
@@ -198,6 +204,14 @@ extern "C" void CalcCameraOffset()
         }
     }
 
+    static float CritAlpha = 0.f;
+    bool bCinematicEffectsEnabled = *(LPBYTE(CamSettingsPtr) + 0x11);
+    if (Config.bUseAutoDisable && bCinematicEffectsEnabled)
+    {
+        // maybe only use this when "Cinematic Effects" is turned on?
+        CritAnimElapsed = min(CritAnimElapsed + 1, CritAnimDelay + 1);
+        CritAlpha = InterpToF(CritAlpha, CritAnimElapsed < CritAnimDelay ? 1.f : 0.f, CritAnimElapsed < CritAnimDelay ? 5.f : 2.f, Frametime);
+    }
     if (Config.bUseAutoDisable)
     {
         //bool bIsResting = CameraData.ParamID == ID_GRACE || CameraData.ParamID == ID_GRACE_TABLE;
@@ -207,6 +221,7 @@ extern "C" void CalcCameraOffset()
         //bool bUseOffset = !bIsTalking && !bIsResting;
         // some interactions don't set the pointer, like getting hugs from Fia
         bool bUseOffset = !(InteractPtr > 1 || CameraData.ParamID == ID_NPC_INTERACT);
+
         // delay re-enabling offset so the camera won't jiggle when going between menus
         if (!bUseOffset)
         {
@@ -219,7 +234,7 @@ extern "C" void CalcCameraOffset()
         ToggleAlpha = InterpToF(ToggleAlpha, EnableOffsetElapsed > EnableOffsetDelay ? 1.f : 0.f, 5.f, Frametime);
     }
 
-    glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * ToggleAlpha;
+    glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * ToggleAlpha * (1.f - CritAlpha);
 
     {
         static float GraceInterp = 0.f;
@@ -298,6 +313,23 @@ UHookRelativeIntermediate HookGetCameraData(
     7,
     &GetCameraData,
     -4
+);
+
+/*
+eldenring.exe+3AF672 - 0FB6 08               - movzx ecx,byte ptr [rax]
+eldenring.exe+3AF675 - 0F28 D7               - movaps xmm2,xmm7
+eldenring.exe+3AF678 - 41 0F28 C8            - movaps xmm1,xmm8
+eldenring.exe+3AF67C - 66 0F6E C1            - movd xmm0,ecx
+eldenring.exe+3AF680 - 0F5B C0               - cvtdq2ps xmm0,xmm0
+eldenring.exe+3AF683 - F3 0F59 05 E111E902   - mulss xmm0,[eldenring.exe+324086C]
+eldenring.exe+3AF68B - E8 D043D8FF           - call eldenring.exe+133A60
+*/
+std::vector<uint16_t> PATTERN_CAMERA_SETTINGS = { 0x0F, 0xB6, 0x08, 0x0F, 0x28, 0xD7, 0x41, 0x0F, 0x28, 0xC8, 0x66, 0x0F, 0x6E, 0xC1, 0x0F, 0x5B, 0xC0, 0xF3, 0x0F, 0x59, 0x05, 0xE1, 0x11, 0xE9, 0x02, 0xE8, 0xD0, 0x43, 0xD8, 0xFF };
+UHookRelativeIntermediate HookCameraSettings(
+    "HookCameraSettings",
+    PATTERN_CAMERA_SETTINGS,
+    6,
+    &GetCameraSettings
 );
 
 /*
@@ -523,6 +555,31 @@ UHookRelativeIntermediate HookInteractState(
     &GetInteractState
 );
 
+/*
+; runs every frame during riposte animations except for certain frames
+; doesn't run when the animations end tho so we can't just set a bool
+eldenring.exe+560B1F - 74 1F                 - je eldenring.exe+560B40
+eldenring.exe+560B21 - 0FB6 00               - movzx eax,byte ptr [rax]
+eldenring.exe+560B24 - 83 E0 01              - and eax,01
+eldenring.exe+560B27 - 84 C0                 - test al,al
+eldenring.exe+560B29 - 74 15                 - je eldenring.exe+560B40
+eldenring.exe+560B2B - E8 C040CFFF           - call eldenring.exe+254BF0
+eldenring.exe+560B30 - 48 85 C0              - test rax,rax
+eldenring.exe+560B33 - 74 0B                 - je eldenring.exe+560B40      ; pattern starts
+eldenring.exe+560B35 - 0FB6 DB               - movzx ebx,bl
+eldenring.exe+560B38 - 33 C9                 - xor ecx,ecx
+eldenring.exe+560B3A - 38 48 11              - cmp [rax+11],cl
+eldenring.exe+560B3D - 0F44 D9               - cmove ebx,ecx
+eldenring.exe+560B40 - 80 7E 28 00           - cmp byte ptr [rsi+28],00
+*/
+std::vector<uint16_t> PATTERN_CRITICAL = { 0x74, 0x0B, 0x0F, 0xB6, 0xDB, 0x33, 0xC9, 0x38, 0x48, 0x11, 0x0F, 0x44, 0xD9, 0x80, 0x7E, 0x28, 0x00 };
+UHookRelativeIntermediate HookCriticalAtk(
+    "HookCriticalAtk",
+    PATTERN_CRITICAL,
+    5,
+    &SetCrit,
+    2
+);
 
 /*
 eldenring.exe.text+D89AD8 - F3 0F11 49 04         - movss [rcx+04],xmm1
@@ -562,18 +619,29 @@ DWORD WINAPI MainThread(LPVOID lpParam)
     std::vector<UHookRelativeIntermediate*> hooks {
         &HookGetFrametime,
         &HookGetCameraData,
+        &HookCameraSettings,
         &HookSetCameraOffset,
         &HookSetCollisionOffsetAlt,
         &HookSetCollisionOffsetAlt1,
         //&HookCollisionAdjust,
         //&HookCollisionAdjust01,
         &HookCollisionAdjust1,
-        &HookMaxDistanceClamp,
         &HookTargetOffset,
-        &HookTargetViewOffset,
         //&HookNPCState,
-        &HookInteractState,
     };
+    if (Config.bUseAutoDisable)
+    {
+        hooks.push_back(&HookInteractState);
+        hooks.push_back(&HookCriticalAtk);
+    }
+    if (Config.SpringbackSpeed > 0)
+    {
+        hooks.push_back(&HookMaxDistanceClamp);
+    }
+    if (Config.bUseTargetOffset || Config.bUseSideSwitch || Config.TargetViewOffsetMul != 1.f)
+    {
+        hooks.push_back(&HookTargetViewOffset);
+    }
     for (UHookRelativeIntermediate* hook : hooks)
     {
         hook->Enable();

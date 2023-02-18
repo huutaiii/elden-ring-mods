@@ -2,11 +2,14 @@ extern ReadCameraData : proto
 extern CalcCameraOffset : proto
 
 ; out
-extern CamBaseAddr : qword
 extern Frametime : dword
+extern CamBaseAddr : qword
+extern CamSettingsPtr : qword
 
 extern bIsTalking : byte
 extern InteractPtr : qword
+
+extern CritAnimElapsed : word
 
 .code
 	GetCameraData proc
@@ -30,6 +33,11 @@ extern InteractPtr : qword
 
 		ret
 	GetCameraData endp
+
+	GetCameraSettings proc
+		mov [CamSettingsPtr], rax
+		ret
+	GetCameraSettings endp
 
 	GetFrametime proc
 		movss [Frametime], xmm1
@@ -62,4 +70,9 @@ extern InteractPtr : qword
 		pop rax
 		ret
 	GetInteractState endp
+
+	SetCrit proc
+		mov [CritAnimElapsed], 0
+		ret
+	SetCrit endp
 end
