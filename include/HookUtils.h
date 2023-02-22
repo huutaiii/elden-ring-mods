@@ -158,13 +158,15 @@ private:
     std::function<void()> fnEnable = []() {};
     std::function<void()> fnDisable = []() {};
 
+    static const std::vector<uint8_t> RSPUp; // lea rsp,[rsp+8] (5B)
+    static const std::vector<uint8_t> RSPDown; // lea rsp,[rsp-8] (5B)
+
     // Initialize the intermediate code that we can decide to jump to later
     void Init()
     {
-        // we still need to store the stolen code somewhere even when we don't want to execute it
-
         size_t SPDownOffset = RSPUp.size() + numBytes;
 
+        // we still need to store the stolen code somewhere even when we don't want to execute it
         if (bUseCall)
         {
             lpIntermediate = allocator.Alloc(numBytes + 14 + RSPUp.size() + RSPDown.size()); // one 14B jump, two 3B adds
@@ -176,6 +178,12 @@ private:
             lpIntermediate = allocator.Alloc(numBytes + 14);
             JumpOffset = numBytes;
             StolenBytesOffset = 0;
+        }
+
+        if (!lpIntermediate)
+        {
+            ModUtils::Log("Cannot allocate memory for hook: %s", msg.c_str());
+            return;
         }
 
         if (bUseCall)
@@ -274,9 +282,6 @@ public:
 
     const bool HasFoundSignature() const { return bCanHook; }
 
-    static const std::vector<uint8_t> RSPUp; // lea rsp,[rsp+8] (5B)
-    static const std::vector<uint8_t> RSPDown; // lea rsp,[rsp-8] (5B)
-
     void Enable()
     {
         if (!lpIntermediate)
@@ -284,7 +289,13 @@ public:
             Init();
         }
 
-        if (!bCanHook || bEnabled) { return; }
+        if (!bCanHook || !lpHook || !lpIntermediate)
+        {
+            ModUtils::RaiseError("Hook activation failed: " + msg);
+            return;
+        }
+
+        if (bEnabled) { return; }
         ModUtils::Log("Enabling hook '%s' from %p to %p", msg.c_str(), lpHook, lpDestination);
 
         // pad the jump in case numBytes > jump instruction size

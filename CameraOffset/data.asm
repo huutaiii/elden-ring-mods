@@ -6,7 +6,6 @@ extern Frametime : dword
 extern CamBaseAddr : qword
 extern CamSettingsPtr : qword
 
-extern bIsTalking : byte
 extern InteractPtr : qword
 
 extern CritAnimElapsed : word
@@ -43,22 +42,6 @@ extern CritAnimElapsed : word
 		movss [Frametime], xmm1
 		ret
 	GetFrametime endp
-
-	GetNPCState proc
-		test rdi, rdi
-		je GetNPCState_return
-		push rax
-		xor al, al
-		mov al, [rsi+28h]
-		and al, 20h
-		cmp al, 0
-		setz al
-		mov [bIsTalking], al
-		pop rax
-
-	GetNPCState_return:
-		ret
-	GetNPCState endp
 
 	GetInteractState proc
 		lea rcx, [rsp+8]

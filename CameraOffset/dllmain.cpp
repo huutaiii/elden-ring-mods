@@ -126,7 +126,6 @@ extern "C"
     bool bLastCollisionHit;
     float LastCollisionDistNormalized;
 
-    uint8_t bIsTalking = 0;
     uint64_t InteractPtr;
 
 
@@ -141,11 +140,8 @@ extern "C"
     void GetCameraData();
     void GetCameraSettings();
     void SetCameraOffset();
-    void SetCollisionOffset();
     void SetCollisionOffsetAlt();
     void SetCollisionOffsetAlt1();
-    void AdjustCollision();
-    void AdjustCollision01();
     void AdjustCollision1();
     void ClampMaxDistance();
     void SetTargetOffset();
@@ -155,7 +151,6 @@ extern "C"
     float TargetViewMaxOffset;
     float TargetViewMaxOffsetMul;
 
-    void GetNPCState();
     void GetInteractState();
     void SetCrit();
 
@@ -191,7 +186,6 @@ extern "C" void CalcCameraOffset()
         if (CameraData.bIsLockedOn)
         {
 
-            //printf("%f %s\n", TargetViewMaxOffsetSqr, glm::to_string(XMMtoGLM(TargetViewOffset)).c_str());
             float ViewOffsetY = XMMtoGLM(TargetViewOffset).y;
             int sign = ViewOffsetY > 0.f ? 1 : -1;
             float ViewOffsetClamped = clamp(sign * sqrt(abs(ViewOffsetY / TargetViewMaxOffset)), -1.f, 1.f);
@@ -214,11 +208,6 @@ extern "C" void CalcCameraOffset()
     }
     if (Config.bUseAutoDisable)
     {
-        //bool bIsResting = CameraData.ParamID == ID_GRACE || CameraData.ParamID == ID_GRACE_TABLE;
-        // some NPCs don't trigger the zoom-in so this doesn't always work
-        //bool bIsTalking = CameraData.ParamID == ID_NPC_INTERACT;
-
-        //bool bUseOffset = !bIsTalking && !bIsResting;
         // some interactions don't set the pointer, like getting hugs from Fia
         bool bUseOffset = !(InteractPtr > 1 || CameraData.ParamID == ID_NPC_INTERACT);
 
@@ -286,7 +275,6 @@ extern "C" void CalcCameraOffset()
     {
         MaxDistanceInterp = InterpToF(MaxDistanceInterp, CameraData.MaxDistance, Config.SpringbackSpeed, Frametime);
         //MaxDistanceInterp = CameraData.MaxDistance;
-        // printf("%f\n", MaxDistanceInterp);
     }
 
     {
@@ -323,8 +311,9 @@ eldenring.exe+3AF67C - 66 0F6E C1            - movd xmm0,ecx
 eldenring.exe+3AF680 - 0F5B C0               - cvtdq2ps xmm0,xmm0
 eldenring.exe+3AF683 - F3 0F59 05 E111E902   - mulss xmm0,[eldenring.exe+324086C]
 eldenring.exe+3AF68B - E8 D043D8FF           - call eldenring.exe+133A60
+0FB6080F28D7410F28C8660F6EC10F5BC0(F30F5905????????E8????????)
 */
-std::vector<uint16_t> PATTERN_CAMERA_SETTINGS = { 0x0F, 0xB6, 0x08, 0x0F, 0x28, 0xD7, 0x41, 0x0F, 0x28, 0xC8, 0x66, 0x0F, 0x6E, 0xC1, 0x0F, 0x5B, 0xC0, 0xF3, 0x0F, 0x59, 0x05, 0xE1, 0x11, 0xE9, 0x02, 0xE8, 0xD0, 0x43, 0xD8, 0xFF };
+std::vector<uint16_t> PATTERN_CAMERA_SETTINGS = { 0x0F, 0xB6, 0x08, 0x0F, 0x28, 0xD7, 0x41, 0x0F, 0x28, 0xC8, 0x66, 0x0F, 0x6E, 0xC1, 0x0F, 0x5B, 0xC0 };
 UHookRelativeIntermediate HookCameraSettings(
     "HookCameraSettings",
     PATTERN_CAMERA_SETTINGS,
@@ -351,25 +340,6 @@ UHookRelativeIntermediate HookSetCameraOffset(
 );
 
 /*
-eldenring.exe+C3F4B3 - 48 8D 4D 10           - lea rcx,[rbp+10]
-eldenring.exe+C3F4B7 - E8 C4F71800           - call eldenring.exe+DCEC80
-eldenring.exe+C3F4BC - 41 0F28 45 00         - movaps xmm0,[r13+00]
-eldenring.exe+C3F4C1 - 48 8B 44 24 38        - mov rax,[rsp+38]
-eldenring.exe+C3F4C6 - 0F58 00               - addps xmm0,[rax]                             ; [rax] = local camera position
-eldenring.exe+C3F4C9 - 0F29 44 24 40         - movaps [rsp+40],xmm0
-eldenring.exe+C3F4CE - 48 8D 54 24 40        - lea rdx,[rsp+40]
-eldenring.exe+C3F4D3 - 48 8D 4D 00           - lea rcx,[rbp+00]
-eldenring.exe+C3F4D7 - E8 A4F71800           - call eldenring.exe+DCEC80
-*/
-std::vector<uint16_t> PATTERN_COLLISON_OFFSET = { 0x48, 0x8B, 0x44, 0x24, 0x38, 0x0F, 0x58, 0x00, 0x0F, 0x29, 0x44, 0x24, 0x40, 0x48, 0x8D, 0x54, 0x24, 0x40, 0x48, 0x8D, 0x4D, 0x00, 0xE8, 0xA4, 0xF7, 0x18, 0x00 };
-UHookRelativeIntermediate HookSetCollisionOffset(
-    "HookSetCollisionOffset",
-    PATTERN_COLLISON_OFFSET,
-    5,
-    &SetCollisionOffset
-);
-
-/*
 eldenring.exe+3B8EF6 - 4C 8D 44 24 60        - lea r8,[rsp+60]
 eldenring.exe+3B8EFB - 0F29 44 24 50         - movaps [rsp+50],xmm0
 eldenring.exe+3B8F00 - 48 8B C8              - mov rcx,rax
@@ -378,8 +348,9 @@ eldenring.exe+3B8F0B - F3 0F11 44 24 20      - movss [rsp+20],xmm0
 eldenring.exe+3B8F11 - E8 FA688800           - call eldenring.exe+C3F810
 eldenring.exe+3B8F16 - 84 C0                 - test al,al
 eldenring.exe+3B8F18 - 74 5C                 - je eldenring.exe+3B8F76
+4C 8D 44 24 60 0F29 44 24 50 48 8B C8 F3 0F10 83 ????0000
 */
-std::vector<uint16_t> PATTERN_COLLISION_ALT = { 0x4C, 0x8D, 0x44, 0x24, 0x60, 0x0F, 0x29, 0x44, 0x24, 0x50, 0x48, 0x8B, 0xC8, 0xF3, 0x0F, 0x10, 0x83, 0xC0, 0x01, 0x00, 0x00, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, 0xFA, 0x68, 0x88, 0x00, 0x84, 0xC0, 0x74, 0x5C };
+std::vector<uint16_t> PATTERN_COLLISION_ALT = { 0x4C, 0x8D, 0x44, 0x24, 0x60, 0x0F, 0x29, 0x44, 0x24, 0x50, 0x48, 0x8B, 0xC8, 0xF3, 0x0F, 0x10, 0x83, MASK, MASK, 0x00, 0x00 };
 // Disables one of the collision checks
 UHookRelativeIntermediate HookSetCollisionOffsetAlt(
     "HookSetCollisionOffsetAlt",
@@ -396,8 +367,9 @@ eldenring.exe+3B5849 - F3 0F11 44 24 20      - movss [rsp+20],xmm0
 eldenring.exe+3B584F - E8 BC9F8800           - call eldenring.exe+C3F810
 eldenring.exe+3B5854 - 84 C0                 - test al,al
 eldenring.exe+3B5856 - 0F84 C3000000         - je eldenring.exe+3B591F
+BA ????0000 48 8B CF 0F29 75 D0 F3 0F11 44 24 20 E8 ????????
 */
-std::vector<uint16_t> PATTERN_COLLISION_ALT1 = { 0xBA, 0x5B, 0x00, 0x00, 0x00, 0x48, 0x8B, 0xCF, 0x0F, 0x29, 0x75, 0xD0, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, 0xBC, 0x9F, 0x88, 0x00, 0x84, 0xC0, 0x0F, 0x84, 0xC3, 0x00, 0x00, 0x00 };
+std::vector<uint16_t> PATTERN_COLLISION_ALT1 = { 0xBA, MASK, MASK, 0x00, 0x00, 0x48, 0x8B, 0xCF, 0x0F, 0x29, 0x75, 0xD0, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, MASK, MASK, MASK, MASK };
 // offset camera collision traces' end point
 UHookRelativeIntermediate HookSetCollisionOffsetAlt1(
     "HookCollisionOffsetAlt1",
@@ -414,8 +386,9 @@ eldenring.exe+3B591B - 0F29 53 40            - movaps [rbx+40],xmm2
 eldenring.exe+3B591F - 48 8B 4D 00           - mov rcx,[rbp+00]
 eldenring.exe+3B5923 - 48 33 CC              - xor rcx,rsp
 eldenring.exe+3B5926 - E8 B5BA0F02           - call eldenring.exe+24B13E0
+0F59 D4 0F59 D0 0F58 55 E0 0F29 53 40 48 8B 4D 00
 */
-std::vector<uint16_t> PATTERN_COLLISION_ADJUST1 = { 0x0F, 0x59, 0xD4, 0x0F, 0x59, 0xD0, 0x0F, 0x58, 0x55, 0xE0, 0x0F, 0x29, 0x53, 0x40, 0x48, 0x8B, 0x4D, 0x00, 0x48, 0x33, 0xCC, 0xE8, 0xB5, 0xBA, 0x0F, 0x02 };
+std::vector<uint16_t> PATTERN_COLLISION_ADJUST1 = { 0x0F, 0x59, 0xD4, 0x0F, 0x59, 0xD0, 0x0F, 0x58, 0x55, 0xE0, 0x0F, 0x29, 0x53, 0x40, 0x48, 0x8B, 0x4D, 0x00 };
 // the collision function sets a location for the camera when the collision trace hits
 // which is unintentionally offset
 // this reverts the offset
@@ -427,32 +400,15 @@ UHookRelativeIntermediate HookCollisionAdjust1(
 );
 
 /*
-eldenring.exe+3B8F6A - 0F58 54 24 60         - addps xmm2,[rsp+60]
-eldenring.exe+3B8F6F - 0F29 93 00010000      - movaps [rbx+00000100],xmm2
-eldenring.exe+3B8F76 - 48 8B 8C 24 80000000  - mov rcx,[rsp+00000080]
-eldenring.exe+3B8F7E - 48 33 CC              - xor rcx,rsp
-eldenring.exe+3B8F81 - E8 5A840F02           - call eldenring.exe+24B13E0
-eldenring.exe+3B8F86 - 0F28 B4 24 90000000   - movaps xmm6,[rsp+00000090]
-eldenring.exe+3B8F8E - 48 81 C4 A0000000     - add rsp,000000A0
-eldenring.exe+3B8F95 - 5B                    - pop rbx
-*/
-std::vector<uint16_t> PATTERN_COLLISION_ADJUST = { 0x0F, 0x58, 0x54, 0x24, 0x60, 0x0F, 0x29, 0x93, 0x00, 0x01, 0x00, 0x00, 0x48, 0x8B, 0x8C, 0x24, 0x80, 0x00, 0x00, 0x00, 0x48, 0x33, 0xCC, 0xE8, 0x5A, 0x84, 0x0F, 0x02, 0x0F, 0x28, 0xB4, 0x24, 0x90, 0x00, 0x00, 0x00, 0x48, 0x81, 0xC4, 0xA0, 0x00, 0x00, 0x00, 0x5B };
-UHookRelativeIntermediate HookCollisionAdjust(
-    "HookCollisionAdjust",
-    PATTERN_COLLISION_ADJUST,
-    5,
-    &AdjustCollision
-);
-
-/*
 eldenring.exe+3B8E88 - 76 0E                 - jna eldenring.exe+3B8E98
 eldenring.exe+3B8E8A - F3 0F10 81 B4010000   - movss xmm0,[rcx+000001B4]
 eldenring.exe+3B8E92 - F3 0F5E C1            - divss xmm0,xmm1
 eldenring.exe+3B8E96 - EB 08                 - jmp eldenring.exe+3B8EA0
 eldenring.exe+3B8E98 - F3 0F10 05 087AE802   - movss xmm0,[eldenring.exe+32408A8]
 eldenring.exe+3B8EA0 - 0FC6 C0 00            - shufps xmm0,xmm0,00
+76 0E F3 0F10 81 ????0000 F3 0F5E C1 EB 08 F3 0F10 05 ????????
 */
-std::vector<uint16_t> PATTERN_MAX_DISTANCE_CLAMP = { 0x76, 0x0E, 0xF3, 0x0F, 0x10, 0x81, 0xB4, 0x01, 0x00, 0x00, 0xF3, 0x0F, 0x5E, 0xC1, 0xEB, 0x08, 0xF3, 0x0F, 0x10, 0x05, 0x08, 0x7A, 0xE8, 0x02, 0x0F, 0xC6, 0xC0, 0x00 };
+std::vector<uint16_t> PATTERN_MAX_DISTANCE_CLAMP = { 0x76, 0x0E, 0xF3, 0x0F, 0x10, 0x81, MASK, MASK, 0x00, 0x00, 0xF3, 0x0F, 0x5E, 0xC1, 0xEB, 0x08, 0xF3, 0x0F, 0x10, 0x05, MASK, MASK, MASK, MASK };
 UHookRelativeIntermediate HookMaxDistanceClamp(
     "HookMaxDistanceClamp",
     PATTERN_MAX_DISTANCE_CLAMP,
@@ -462,32 +418,15 @@ UHookRelativeIntermediate HookMaxDistanceClamp(
 );
 
 /*
-eldenring.exe+3B8F1A - 0F28 5C 24 50         - movaps xmm3,[rsp+50]
-eldenring.exe+3B8F1F - 0F28 D3               - movaps xmm2,xmm3
-eldenring.exe+3B8F22 - 0F59 D3               - mulps xmm2,xmm3
-eldenring.exe+3B8F25 - 0F28 CA               - movaps xmm1,xmm2
-eldenring.exe+3B8F28 - 0FC6 CA 66            - shufps xmm1,xmm2,66
-eldenring.exe+3B8F2C - F3 0F58 D1            - addss xmm2,xmm1
-eldenring.exe+3B8F30 - 0F28 C1               - movaps xmm0,xmm1
-eldenring.exe+3B8F33 - 0FC6 C1 55            - shufps xmm0,xmm1,55
-*/
-std::vector<uint16_t> PATTERN_COLLISION_ADJUST01 = { 0x0F, 0x28, 0x5C, 0x24, 0x50, 0x0F, 0x28, 0xD3, 0x0F, 0x59, 0xD3, 0x0F, 0x28, 0xCA, 0x0F, 0xC6, 0xCA, 0x66, 0xF3, 0x0F, 0x58, 0xD1, 0x0F, 0x28, 0xC1, 0x0F, 0xC6, 0xC1, 0x55 };
-UHookRelativeIntermediate HookCollisionAdjust01(
-    "HookCollisionAdjust01",
-    PATTERN_COLLISION_ADJUST01,
-    5,
-    &AdjustCollision01
-);
-
-/*
 eldenring.exe+3B7DE9 - 0F28 99 F0020000      - movaps xmm3,[rcx+000002F0]
 eldenring.exe+3B7DF0 - 0F28 A1 E0000000      - movaps xmm4,[rcx+000000E0]
 eldenring.exe+3B7DF7 - 44 0F28 CB            - movaps xmm9,xmm3
 eldenring.exe+3B7DFB - 44 0F5C CC            - subps xmm9,xmm4
 eldenring.exe+3B7DFF - 66 44 0F7F 8D A0000000  - movdqa [rbp+000000A0],xmm9
 eldenring.exe+3B7E08 - 66 44 0F7F 8D 90000000  - movdqa [rbp+00000090],xmm9
+0F28 99 ????0000 0F28 A1 ????0000 44 0F28 CB 44 0F5C CC
 */
-std::vector<uint16_t> PATTERN_TARGET_OFFSET = { 0x0F, 0x28, 0x99, 0xF0, 0x02, 0x00, 0x00, 0x0F, 0x28, 0xA1, 0xE0, 0x00, 0x00, 0x00, 0x44, 0x0F, 0x28, 0xCB, 0x44, 0x0F, 0x5C, 0xCC, 0x66, 0x44, 0x0F, 0x7F, 0x8D, 0xA0, 0x00, 0x00, 0x00, 0x66, 0x44, 0x0F, 0x7F, 0x8D, 0x90, 0x00, 0x00, 0x00 };
+std::vector<uint16_t> PATTERN_TARGET_OFFSET = { 0x0F, 0x28, 0x99, MASK, MASK, 0x00, 0x00, 0x0F, 0x28, 0xA1, MASK, MASK, 0x00, 0x00, 0x44, 0x0F, 0x28, 0xCB, 0x44, 0x0F, 0x5C, 0xCC };
 // offset the lock-on target in world space to keep them centered on-screen
 UHookRelativeIntermediate HookTargetOffset(
     "HookTargetOffset",
@@ -505,36 +444,15 @@ eldenring.exe+3B8A22 - 0F2F E5               - comiss xmm4,xmm5
 eldenring.exe+3B8A25 - 76 0D                 - jna eldenring.exe+3B8A34
 eldenring.exe+3B8A27 - 44 0F29 8E 50010000   - movaps [rsi+00000150],xmm9
 eldenring.exe+3B8A2F - E9 A8010000           - jmp eldenring.exe+3B8BDC
+F3 44 0F10 AE ????0000 41 0F28 E5 F3 41 0F59 E5 0F2F E5
 */
-std::vector<uint16_t> PATTERN_TARGET_VIEW_OFFSET = { 0xF3, 0x44, 0x0F, 0x10, 0xAE, 0xE0, 0x02, 0x00, 0x00, 0x41, 0x0F, 0x28, 0xE5, 0xF3, 0x41, 0x0F, 0x59, 0xE5, 0x0F, 0x2F, 0xE5, 0x76, 0x0D, 0x44, 0x0F, 0x29, 0x8E, 0x50, 0x01, 0x00, 0x00, 0xE9, 0xA8, 0x01, 0x00, 0x00 };
+std::vector<uint16_t> PATTERN_TARGET_VIEW_OFFSET = { 0xF3, 0x44, 0x0F, 0x10, 0xAE, MASK, MASK, 0x00, 0x00, 0x41, 0x0F, 0x28, 0xE5, 0xF3, 0x41, 0x0F, 0x59, 0xE5, 0x0F, 0x2F, 0xE5 };
 UHookRelativeIntermediate HookTargetViewOffset(
     "HookTargetViewOffset",
     PATTERN_TARGET_VIEW_OFFSET,
     9,
     &GetTargetViewOffset,
     0
-);
-
-/*
-eldenring.exe+203DFA2 - 41 8B D4              - mov edx,r12d
-eldenring.exe+203DFA5 - FF 50 28              - call qword ptr [rax+28]
-eldenring.exe+203DFA8 - 4C 8D 44 24 40        - lea r8,[rsp+40]
-eldenring.exe+203DFAD - 48 8B D6              - mov rdx,rsi
-eldenring.exe+203DFB0 - 48 8B 4E 20           - mov rcx,[rsi+20]
-eldenring.exe+203DFB4 - E8 F7120000           - call eldenring.exe+203F2B0
-eldenring.exe+203DFB9 - 48 8B E8              - mov rbp,rax
-eldenring.exe+203DFBC - 48 85 C0              - test rax,rax
-eldenring.exe+203DFBF - 0F84 8A000000         - je eldenring.exe+203E04F
-eldenring.exe+203DFC5 - 48 8B BE 80000000     - mov rdi,[rsi+00000080]
-*/
-std::vector<uint16_t> PATTERN_NPC_STATE = { 0x41, 0x8B, 0xD4, 0xFF, 0x50, 0x28, 0x4C, 0x8D, 0x44, 0x24, 0x40, 0x48, 0x8B, 0xD6, 0x48, 0x8B, 0x4E, 0x20, 0xE8, 0xF7, 0x12, 0x00, 0x00, 0x48, 0x8B, 0xE8, 0x48, 0x85, 0xC0, 0x0F, 0x84, 0x8A, 0x00, 0x00, 0x00, 0x48, 0x8B, 0xBE, 0x80, 0x00, 0x00, 0x00 };
-// this gets run during load-screens and sometimes return the opposite values
-UHookRelativeIntermediate HookNPCState(
-    "HookNPCState",
-    PATTERN_NPC_STATE,
-    7,
-    &GetNPCState,
-    35
 );
 
 /*
@@ -545,8 +463,9 @@ eldenring.exe+3B5ABA - 89 93 60040000         - mov [rbx+00000460],edx
 eldenring.exe+3B5AC0 - 48 C7 44 24 20 00000000 - mov qword ptr [rsp+20],00000000
 eldenring.exe+3B5AC9 - 89 54 24 28            - mov [rsp+28],edx
 eldenring.exe+3B5ACD - E8 5E0E9500            - call eldenring.exe+D06930
+8B 83 ????0000 48 8D 4C 24 ?? 89 83 ????0000 89 93 ????0000 48 C7 44 24 ?? 00000000
 */
-std::vector<uint16_t> PATTERN_INTERACT_STATE = { 0x8B, 0x83, 0xD4, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x4C, 0x24, 0x20, 0x89, 0x83, 0xD0, 0x01, 0x00, 0x00, 0x89, 0x93, 0x60, 0x04, 0x00, 0x00, 0x48, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00, 0x00, 0x00, 0x89, 0x54, 0x24, 0x28, 0xE8, 0x5E, 0x0E, 0x95, 0x00 };
+std::vector<uint16_t> PATTERN_INTERACT_STATE = { 0x8B, 0x83, MASK, MASK, 0x00, 0x00, 0x48, 0x8D, 0x4C, 0x24, MASK, 0x89, 0x83, MASK, MASK, 0x00, 0x00, 0x89, 0x93, MASK, MASK, 0x00, 0x00, 0x48, 0xC7, 0x44, 0x24, MASK, 0x00, 0x00, 0x00, 0x00 };
 // this may not work on future game versions
 UHookRelativeIntermediate HookInteractState(
     "HookInteractState",
@@ -571,8 +490,10 @@ eldenring.exe+560B38 - 33 C9                 - xor ecx,ecx
 eldenring.exe+560B3A - 38 48 11              - cmp [rax+11],cl
 eldenring.exe+560B3D - 0F44 D9               - cmove ebx,ecx
 eldenring.exe+560B40 - 80 7E 28 00           - cmp byte ptr [rsi+28],00
+74 0B 0FB6 DB 33 C9 38 48 11 0F44 D9 80 7E ?? 00
+                          --
 */
-std::vector<uint16_t> PATTERN_CRITICAL = { 0x74, 0x0B, 0x0F, 0xB6, 0xDB, 0x33, 0xC9, 0x38, 0x48, 0x11, 0x0F, 0x44, 0xD9, 0x80, 0x7E, 0x28, 0x00 };
+std::vector<uint16_t> PATTERN_CRITICAL = { 0x74, 0x0B, 0x0F, 0xB6, 0xDB, 0x33, 0xC9, 0x38, 0x48, 0x11, 0x0F, 0x44, 0xD9, 0x80, 0x7E, MASK, 0x00 };
 UHookRelativeIntermediate HookCriticalAtk(
     "HookCriticalAtk",
     PATTERN_CRITICAL,
@@ -603,17 +524,6 @@ UHookRelativeIntermediate HookGetFrametime(
 #pragma warning(suppress: 4100)
 DWORD WINAPI MainThread(LPVOID lpParam)
 {
-    //std::string configPath = ModUtils::GetModuleFolderPath() + "\\config.ini";
-    //ModUtils::Log("config file path: %s", configPath.c_str());
-    //if (!UConfig::CheckConfigFile(configPath))
-    //{
-    //    ModUtils::Log("Creating config file");
-    //    std::ofstream file;
-    //    file.open(configPath);
-    //    file << UConfig::GetDefaultConfig();
-    //    file.close();
-    //}
-    //Config = FModConfig(INIReader(configPath));
     Config.ReadFile(ModUtils::GetModuleFolderPath() + "\\config.ini");
 
     std::vector<UHookRelativeIntermediate*> hooks {
@@ -623,11 +533,8 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         &HookSetCameraOffset,
         &HookSetCollisionOffsetAlt,
         &HookSetCollisionOffsetAlt1,
-        //&HookCollisionAdjust,
-        //&HookCollisionAdjust01,
         &HookCollisionAdjust1,
         &HookTargetOffset,
-        //&HookNPCState,
     };
     if (Config.bUseAutoDisable)
     {
@@ -646,24 +553,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
     {
         hook->Enable();
     }
-    /*HookGetFrametime.Enable();
-    HookGetCameraData.Enable();
-    HookSetCameraOffset.Enable();
-    HookSetCollisionOffsetAlt.Enable();
-    HookSetCollisionOffsetAlt1.Enable();
-    HookCollisionAdjust.Enable();
-    HookCollisionAdjust01.Enable();
-    HookCollisionAdjust1.Enable();*/
 
-    // disables one of the collision checks?
-    {
-        //uintptr_t addr = ModUtils::SigScan({ 0x0F, 0x84, 0xC3, 0x00, 0x00, 0x00, 0x0F, 0x28, 0x65, 0xD0, 0x0F, 0x28, 0xD4, 0x0F, 0x59, 0xD4, 0x0F, 0x28, 0xCA, 0x0F, 0xC6, 0xCA, 0x66, 0xF3, 0x0F, 0x58, 0xD1 });
-        //if (addr)
-        //{
-        //    *reinterpret_cast<char*>(addr) = 0x90;
-        //    *reinterpret_cast<char*>(addr+1) = 0xE9;
-        //}
-    }
 
 #ifdef _DEBUG
     while (true)
@@ -671,15 +561,6 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
-            printf("ParamID = %d\n", CameraData.ParamID);
-            printf("%p\n", InteractPtr);
-            //printf("%s\n", glm::to_string(CameraData.DirForward).c_str());
-            //printf("LocFinal = %s\n", glm::to_string(CameraData.LocFinal).c_str());
-            //printf("LocPivot = %s\n", glm::to_string(CameraData.LocPivot).c_str());
-            //printf("LocPivotInterp = %s\n", glm::to_string(CameraData.LocPivotInterp).c_str());
-            //printf("LocTarget = %s\n", glm::to_string(CameraData.LocTarget).c_str());
-            //printf("Rotation = %s\n", glm::to_string(CameraData.Rotation).c_str());
-            //printf("%f %f\n", CameraData.MaxDistance, saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance));
         }
         if (ModUtils::CheckHotkey(0x71))
         {
@@ -688,14 +569,6 @@ DWORD WINAPI MainThread(LPVOID lpParam)
                 pHook->Toggle();
             }
         }
-        if (ModUtils::CheckHotkey(0x72))
-        {
-            SideSwitch = -SideSwitch;
-        }
-        //if (ModUtils::CheckHotkey(0x73))
-        //{
-        //    HookSetCollisionOffsetAlt1.Toggle();
-        //}
         Sleep(2);
     }
 #endif

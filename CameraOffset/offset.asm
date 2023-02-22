@@ -24,13 +24,10 @@ extern TargetViewMaxOffsetMul : dword
 		ret
 	SetCameraOffset endp
 
-	SetCollisionOffset proc
-		addps xmm0, [CollisionOffset]
-		ret
-	SetCollisionOffset endp
-
 	SetCollisionOffsetAlt proc
 		;addps xmm0, [CollisionOffset]
+
+		; disables this collision check
 		xorps xmm0, xmm0
 		ret
 	SetCollisionOffsetAlt endp
@@ -52,16 +49,6 @@ extern TargetViewMaxOffsetMul : dword
 
 		ret
 	AdjustCollision1 endp
-
-	AdjustCollision proc
-		subps xmm2, [CollisionOffset]
-		ret
-	AdjustCollision endp
-
-	AdjustCollision01 proc
-		;subps xmm3, [CollisionOffset]
-		ret
-	AdjustCollision01 endp
 
 	ClampMaxDistance proc
 		movss xmm0, [MaxDistanceInterp]
