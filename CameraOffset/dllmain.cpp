@@ -306,11 +306,13 @@ extern "C" void CalcCameraOffset()
     static float TargetDistAdjust = 1.f;
     if (CameraData.bIsLockedOn)
     {
-        float targetDistance = glm::distance(CameraData.LocPivotInterp, CameraData.LocTarget);
+        // distance in Y plane
+        float targetDistance = glm::length((CameraData.LocTarget - CameraData.LocPivotInterp).xyz * glm::vec3(1, 0, 1));
         //glm::vec3 targetOffset = cameraOffset * (0.0625f * (-1.f) * pow(targetDistance > 1.f ? targetDistance : pow(targetDistance, 1 / targetDistance), 1.125f));
 
         // clamp offset when locked on to avoid the camera spinning around
-        TargetDistAdjust = pow(1.f - 1 / exp2(max(targetDistance - .1f, 0.f)), 2);
+        TargetDistAdjust = 1.f - 1 / exp2(targetDistance);
+        TargetDistAdjust *= TargetDistAdjust;
 
         if (Config.bUseTargetOffset)
         {
