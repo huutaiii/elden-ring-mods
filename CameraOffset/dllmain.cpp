@@ -38,6 +38,12 @@ struct FModConfig
     bool bUseTargetOffset = false;
     bool bUseAutoDisable = false;
 
+    struct UKeys
+    {
+        int Toggle = 0;
+        int ToggleOffset = 0;
+    } Keys;
+
     void ReadINI(INIReader ini)
     {
         Offset = ini.GetVec("main", "offset", Offset);
@@ -53,6 +59,9 @@ struct FModConfig
         bUseSideSwitch = ini.GetBoolean("main", "dynamic-lockon-offset", bUseSideSwitch);
         bUseTargetOffset = ini.GetBoolean("main", "use-offset-on-target", bUseTargetOffset);
         bUseAutoDisable = ini.GetBoolean("main", "auto-toggle", false);
+
+        Keys.Toggle = ini.GetInteger("keybinding", "toggle-hooks", Keys.Toggle);
+        Keys.ToggleOffset = ini.GetInteger("keybinding", "toggle-offset", Keys.ToggleOffset);
 
         //ModUtils::Log("offset: %s", glm::to_string(Offset).c_str());
     }
@@ -195,11 +204,20 @@ const int EnableOffsetDelay = 2;
 int EnableOffsetElapsed = 0;
 const WORD CritAnimDelay = 15;
 
+bool Control = true;
+
 extern "C" void CalcCameraOffset()
 {
+    if (!Control)
     {
-        static unsigned long FC = 0;
-        ++FC;
+        TargetOffset = _mm_set_ps(0, 0, 0, 0);
+        MaxDistanceInterp = CameraData.MaxDistance;
+        TargetAimAreaMul = 1.f;
+        TargetViewOffsetMul = 1.f;
+        CollisionOffset = _mm_set_ps(0, 0, 0, 0);
+        RetractCollisionOffset = _mm_set_ps(0, 0, 0, 0);
+        CameraOffset = GLMtoXMM(InterpToV(XMMtoGLM(CameraOffset), glm::vec4(0), 5.f, Frametime));
+        return;
     }
 
     TargetViewOffsetMul = Config.TargetViewOffsetMul;
@@ -644,6 +662,24 @@ DWORD WINAPI MainThread(LPVOID lpParam)
             }
         }
         Sleep(2);
+    }
+#else
+    if (Config.Keys.Toggle || Config.Keys.ToggleOffset)
+    {
+        while (true)
+        {
+            if (Config.Keys.Toggle && ModUtils::CheckHotkey(Config.Keys.Toggle))
+            {
+                for (UHookRelativeIntermediate* pHook : hooks)
+                {
+                    pHook->Toggle();
+                }
+            }
+            if (Config.Keys.ToggleOffset && ModUtils::CheckHotkey(Config.Keys.ToggleOffset))
+            {
+                Control = !Control;
+            }
+        }
     }
 #endif
 

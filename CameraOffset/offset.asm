@@ -6,6 +6,9 @@ extern RetractCollisionOffset : xmmword
 extern MaxDistanceInterp : dword
 extern TargetOffset : xmmword
 
+extern TargetAimAreaMul : dword
+extern TargetViewOffsetMul : dword
+
 ;out
 extern bLastCollisionHit : byte
 extern LastCollisionPos : xmmword
@@ -13,8 +16,6 @@ extern LastCollisionDistNormalized : dword
 
 extern TargetViewOffset : xmmword
 extern TargetViewMaxOffset : dword
-extern TargetAimAreaMul : dword
-extern TargetViewOffsetMul : dword
 
 .data
 	iCollision byte 0
