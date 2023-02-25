@@ -151,7 +151,9 @@
       <AdditionalDependencies>xinput.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>powershell.exe -File $(SolutionDir)install.ps1 -SolutionDir $(SolutionDir) -TargetName $(ProjectName) -Configuration $(ConfigurationName) -Platform $(PlatformName)</Command>
+      <Command>mkdir $(OutDir)$(ProjectName)
+copy $(ProjectDir)config.ini $(OutDir)$(ProjectName)\
+powershell.exe -File $(SolutionDir)install.ps1 -SolutionDir $(SolutionDir) -TargetName $(ProjectName) -Configuration $(ConfigurationName) -Platform $(PlatformName)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

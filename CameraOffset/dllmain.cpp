@@ -26,11 +26,15 @@ struct FModConfig
 {
     glm::vec3 Offset = {};
     glm::vec3 OffsetLockon = {};
-    bool bUseSideSwitch = false;
+
     float OffsetInterpSpeed = 0;
     float SpringbackSpeed = 0;
     float TargetViewOffsetMul = 1.f;
     float TargetAimAreaMul = 1.f;
+    float LookAhead = 0.f;
+    float LookAheadZ = -1.f;
+
+    bool bUseSideSwitch = false;
     bool bUseTargetOffset = false;
     bool bUseAutoDisable = false;
 
@@ -38,13 +42,17 @@ struct FModConfig
     {
         Offset = ini.GetVec("main", "offset", Offset);
         OffsetLockon = ini.GetVec("main", "offset-lockon", Offset);
-        bUseSideSwitch = ini.GetBoolean("main", "dynamic-lockon-offset", bUseSideSwitch);
+
         OffsetInterpSpeed = ini.GetReal("main", "interpolation-speed", OffsetInterpSpeed);
         SpringbackSpeed = ini.GetReal("main", "collision-springback-speed", SpringbackSpeed);
         TargetViewOffsetMul = ini.GetReal("main", "target-view-offset-multiplier", TargetViewOffsetMul);
         TargetAimAreaMul = ini.GetReal("main", "target-aim-area-multiplier", TargetAimAreaMul);
+        LookAhead = ini.GetReal("main", "look-ahead", LookAhead);
+        LookAheadZ = ini.GetReal("main", "look-ahead-z", LookAheadZ);
+
+        bUseSideSwitch = ini.GetBoolean("main", "dynamic-lockon-offset", bUseSideSwitch);
         bUseTargetOffset = ini.GetBoolean("main", "use-offset-on-target", bUseTargetOffset);
-        bUseAutoDisable = ini.GetBoolean("main", "automatic-disabling", false);
+        bUseAutoDisable = ini.GetBoolean("main", "auto-toggle", false);
 
         //ModUtils::Log("offset: %s", glm::to_string(Offset).c_str());
     }
@@ -94,23 +102,35 @@ struct FCameraData
 
     uint32_t ParamID = 0;
 
-    FCameraData(LPVOID BaseAddr = nullptr) : BaseAddress(BaseAddr)
-    {
-        if (BaseAddr)
-        {
-            char* baseAddr = (char*)BaseAddr;
+private:
+    glm::vec4 PrevLocPivot;
 
-            LocPivot = MemToGLM(baseAddr + 0xB0);
-            LocPivotInterp = MemToGLM(baseAddr + 0xC0);
-            LocFinal = MemToGLM(baseAddr + 0x100);
-            LocFinalInterp = MemToGLM(baseAddr + 0x110);
-            Rotation = MemToGLM(baseAddr + 0x150);
-            LocTarget = MemToGLM(baseAddr + 0x2F0);
-            // .x = distance with collision but lower?, .y and .z each has a slightly different interpolation speed, no collision
-            MaxDistance = MemToGLM(baseAddr + 0x1B0).z;
-            bIsLockedOn = (*(char*)(baseAddr + 0x49B) & 0x01) != 0;
-            ParamID = *(uint32_t*)(baseAddr + 0x460);
+public:
+    glm::vec3 PivotVelocity;
+
+    void Update(LPVOID BaseAddr = nullptr)
+    {
+        if (!BaseAddr)
+        {
+            return;
         }
+
+        BaseAddress = BaseAddr;
+        char* baseAddr = (char*)BaseAddr;
+
+        LocPivot = MemToGLM(baseAddr + 0xB0);
+        LocPivotInterp = MemToGLM(baseAddr + 0xC0);
+        LocFinal = MemToGLM(baseAddr + 0x100);
+        LocFinalInterp = MemToGLM(baseAddr + 0x110);
+        Rotation = MemToGLM(baseAddr + 0x150);
+        LocTarget = MemToGLM(baseAddr + 0x2F0);
+        // .x = distance with collision but lower?, .y and .z each has a slightly different interpolation speed, no collision
+        MaxDistance = MemToGLM(baseAddr + 0x1B0).z;
+        bIsLockedOn = (*(char*)(baseAddr + 0x49B) & 0x01) != 0;
+        ParamID = *(uint32_t*)(baseAddr + 0x460);
+
+        PivotVelocity = LocPivot - PrevLocPivot;
+        PrevLocPivot = LocPivot;
     }
 
 };
@@ -165,7 +185,7 @@ extern "C"
 // Called by asm hook to make sure the pointer is always valid
 extern "C" void ReadCameraData()
 {
-    CameraData = FCameraData(CamBaseAddr);
+    CameraData.Update(CamBaseAddr);
 }
 
 float LockonAlpha = 0.f;
@@ -229,7 +249,8 @@ extern "C" void CalcCameraOffset()
         ToggleAlpha = InterpToF(ToggleAlpha, EnableOffsetElapsed > EnableOffsetDelay ? 1.f : 0.f, 5.f, Frametime);
     }
 
-    glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * ToggleAlpha * (1.f - CritAlpha);
+    float offsetAlpha = ToggleAlpha * (1.f - CritAlpha);
+    glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * offsetAlpha;
 
     {
         static float GraceInterp = 0.f;
@@ -238,8 +259,30 @@ extern "C" void CalcCameraOffset()
     }
 
     glm::mat4 rotation = glm::rotateNormalizedAxis(glm::mat4(1), CameraData.Rotation.y, glm::vec3(0, 1, 0));
+
+    if (Config.LookAhead > 0.f)
+    {
+        static glm::vec3 MovementOffsetInterp = {};
+
+        glm::vec3 localvelocity = glm::inverse(rotation) * glm::vec4(CameraData.PivotVelocity, 0);
+        localvelocity = ClampVecLength(localvelocity, 1.f);
+        glm::vec3 scale = glm::vec3(Config.LookAhead * 10.f);
+        scale.y = 0.f;
+        if (Config.LookAheadZ >= 0.f)
+        {
+            scale.z = Config.LookAheadZ;
+        }
+
+        bool bIsMoving = glm::length(localvelocity) > 0.0001f;
+        float speed = max(scale.x, scale.z);
+        MovementOffsetInterp = InterpToV(MovementOffsetInterp, CameraData.bIsLockedOn ? glm::vec3(0) : localvelocity * scale, bIsMoving ? speed / 6 : speed / 8, Frametime);
+
+        localMaxOffset += MovementOffsetInterp * offsetAlpha;
+    }
+    
+
     float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
-    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 0, 0), 1);
+    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 1, 1), 1);
     glm::vec3 collisionOffset = cameraOffset;
 
     static float TargetDistAdjust = 1.f;

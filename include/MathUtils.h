@@ -169,3 +169,14 @@ inline T InterpToFConstant(T current, T target, double speed, double deltaTime, 
         return clamp(T(current - deltaTime * speed), target, current);
     }
 }
+
+template <glm::length_t L, typename T, glm::qualifier Q>
+inline glm::vec<L, T, Q> ClampVecLength(glm::vec<L, T, Q> vec, T maxlength)
+{
+    T length = glm::length(vec);
+    if (length > 0.0001f)
+    {
+        return glm::normalize(vec) * min(length, maxlength);
+    }
+    return glm::vec<L, T, Q>({});
+}
