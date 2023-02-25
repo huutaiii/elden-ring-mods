@@ -13,7 +13,8 @@ extern LastCollisionDistNormalized : dword
 
 extern TargetViewOffset : xmmword
 extern TargetViewMaxOffset : dword
-extern TargetViewMaxOffsetMul : dword
+extern TargetAimAreaMul : dword
+extern TargetViewOffsetMul : dword
 
 .data
 	iCollision byte 0
@@ -62,9 +63,14 @@ extern TargetViewMaxOffsetMul : dword
 	SetTargetOffset endp
 
 	GetTargetViewOffset proc
-		mulss xmm13, [TargetViewMaxOffsetMul]
+		mulss xmm13, [TargetAimAreaMul]
 		movss [TargetViewMaxOffset], xmm13
 		movaps [TargetViewOffset], xmm6
 		ret
 	GetTargetViewOffset endp
+
+	TargetViewYOffset proc
+		mulss xmm13, [TargetViewOffsetMul]
+		ret
+	TargetViewYOffset endp
 end

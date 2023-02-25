@@ -30,6 +30,7 @@ struct FModConfig
     float OffsetInterpSpeed = 0;
     float SpringbackSpeed = 0;
     float TargetViewOffsetMul = 1.f;
+    float TargetAimAreaMul = 1.f;
     bool bUseTargetOffset = false;
     bool bUseAutoDisable = false;
 
@@ -41,6 +42,7 @@ struct FModConfig
         OffsetInterpSpeed = ini.GetReal("main", "interpolation-speed", OffsetInterpSpeed);
         SpringbackSpeed = ini.GetReal("main", "collision-springback-speed", SpringbackSpeed);
         TargetViewOffsetMul = ini.GetReal("main", "target-view-offset-multiplier", TargetViewOffsetMul);
+        TargetAimAreaMul = ini.GetReal("main", "target-aim-area-multiplier", TargetAimAreaMul);
         bUseTargetOffset = ini.GetBoolean("main", "use-offset-on-target", bUseTargetOffset);
         bUseAutoDisable = ini.GetBoolean("main", "automatic-disabling", false);
 
@@ -145,11 +147,14 @@ extern "C"
     void AdjustCollision1();
     void ClampMaxDistance();
     void SetTargetOffset();
+    void TargetViewYOffset();
 
     void GetTargetViewOffset();
     __m128 TargetViewOffset;
     float TargetViewMaxOffset;
-    float TargetViewMaxOffsetMul;
+    float TargetViewOffsetMul;
+
+    float TargetAimAreaMul;
 
     void GetInteractState();
     void SetCrit();
@@ -177,7 +182,8 @@ extern "C" void CalcCameraOffset()
         ++FC;
     }
 
-    TargetViewMaxOffsetMul = Config.TargetViewOffsetMul;
+    TargetViewOffsetMul = Config.TargetViewOffsetMul;
+    TargetAimAreaMul = Config.TargetAimAreaMul;
 
     LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, CameraData.bIsLockedOn ? 3.f : 2.f, Frametime);
 
@@ -456,6 +462,27 @@ UHookRelativeIntermediate HookTargetViewOffset(
 );
 
 /*
+eldenring.exe+3B5E5E - F3 0F10 83 E4020000   - movss xmm0,[rbx+000002E4]
+eldenring.exe+3B5E66 - F3 44 0F5C E8         - subss xmm13,xmm0
+eldenring.exe+3B5E6B - F3 44 0F11 63 50      - movss [rbx+50],xmm12
+eldenring.exe+3B5E71 - F3 44 0F11 9B 58020000  - movss [rbx+00000258],xmm11
+eldenring.exe+3B5E7A - F3 44 0F59 EE         - mulss xmm13,xmm6
+eldenring.exe+3B5E7F - F3 44 0F58 E8         - addss xmm13,xmm0
+eldenring.exe+3B5E84 - F3 0F10 83 94010000   - movss xmm0,[rbx+00000194]
+
+F3 0F10 83 ????0000 F3 44 0F5C E8 F3 44 0F11 63 ?? F3 44 0F11 9B ????0000
+
+F3 44 0F5C F0 F3 44 0F11 AB ????0000 44 0F28 6C 24 ?? F3 44 0F59 F6 //F3 44 0F58 F0
+*/
+std::vector<uint16_t> PATTERN_TARGET_Y_OFFSET = { 0xF3, 0x0F, 0x10, 0x83, MASK, MASK, 0x00, 0x00, 0xF3, 0x44, 0x0F, 0x5C, 0xE8, 0xF3, 0x44, 0x0F, 0x11, 0x63, MASK, 0xF3, 0x44, 0x0F, 0x11, 0x9B, MASK, MASK, 0x00, 0x00 };
+UHookRelativeIntermediate HookTargetYOffset(
+    "HookTargetYOffset",
+    PATTERN_TARGET_Y_OFFSET,
+    8,
+    &TargetViewYOffset
+);
+
+/*
 eldenring.exe+3B5AA9 - 8B 83 D4010000         - mov eax,[rbx+000001D4]
 eldenring.exe+3B5AAF - 48 8D 4C 24 20         - lea rcx,[rsp+20]
 eldenring.exe+3B5AB4 - 89 83 D0010000         - mov [rbx+000001D0],eax
@@ -545,9 +572,13 @@ DWORD WINAPI MainThread(LPVOID lpParam)
     {
         hooks.push_back(&HookMaxDistanceClamp);
     }
-    if (Config.bUseTargetOffset || Config.bUseSideSwitch || Config.TargetViewOffsetMul != 1.f)
+    if (Config.bUseTargetOffset || Config.bUseSideSwitch || Config.TargetAimAreaMul != 1.f)
     {
         hooks.push_back(&HookTargetViewOffset);
+    }
+    if (Config.TargetViewOffsetMul != 1.f)
+    {
+        hooks.push_back(&HookTargetYOffset);
     }
     for (UHookRelativeIntermediate* hook : hooks)
     {
