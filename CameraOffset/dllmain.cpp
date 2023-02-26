@@ -172,8 +172,8 @@ extern "C"
     void GetCameraSettings();
     void SetCameraOffset();
     void SetCollisionOffsetAlt();
-    void SetCollisionOffsetAlt1();
-    void AdjustCollision1();
+    void SetCollisionOffset();
+    void AdjustCollision();
     void ClampMaxDistance();
     void SetTargetOffset();
     void TargetViewYOffset();
@@ -419,13 +419,14 @@ eldenring.exe+3B8F16 - 84 C0                 - test al,al
 eldenring.exe+3B8F18 - 74 5C                 - je eldenring.exe+3B8F76
 4C 8D 44 24 60 0F29 44 24 50 48 8B C8 F3 0F10 83 ????0000
 */
-std::vector<uint16_t> PATTERN_COLLISION_ALT = { 0x4C, 0x8D, 0x44, 0x24, 0x60, 0x0F, 0x29, 0x44, 0x24, 0x50, 0x48, 0x8B, 0xC8, 0xF3, 0x0F, 0x10, 0x83, MASK, MASK, 0x00, 0x00 };
-// Disables one of the collision checks
-UHookRelativeIntermediate HookSetCollisionOffsetAlt(
-    "HookSetCollisionOffsetAlt",
-    PATTERN_COLLISION_ALT,
+std::vector<uint16_t> PATTERN_COLLISION_DISABLE = { 0x4C, 0x8D, 0x44, 0x24, 0x60, 0x0F, 0x29, 0x44, 0x24, 0x50, 0x48, 0x8B, 0xC8, 0xF3, 0x0F, 0x10, 0x83, MASK, MASK, 0x00, 0x00 };
+// Disable the collision check that make the camera turn around
+UMemReplace DisableCollisionCheck(
+    "DisableCollisionCheck",
+    PATTERN_COLLISION_DISABLE,
+    std::vector<uint8_t>{ 0x48, 0x31, 0xC0 }, // xor rax, rax
     5,
-    &SetCollisionOffsetAlt
+    27
 );
 
 /*
@@ -438,13 +439,13 @@ eldenring.exe+3B5854 - 84 C0                 - test al,al
 eldenring.exe+3B5856 - 0F84 C3000000         - je eldenring.exe+3B591F
 BA ????0000 48 8B CF 0F29 75 D0 F3 0F11 44 24 20 E8 ????????
 */
-std::vector<uint16_t> PATTERN_COLLISION_ALT1 = { 0xBA, MASK, MASK, 0x00, 0x00, 0x48, 0x8B, 0xCF, 0x0F, 0x29, 0x75, 0xD0, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, MASK, MASK, MASK, MASK };
+std::vector<uint16_t> PATTERN_COLLISION_OFFSET = { 0xBA, MASK, MASK, 0x00, 0x00, 0x48, 0x8B, 0xCF, 0x0F, 0x29, 0x75, 0xD0, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, MASK, MASK, MASK, MASK };
 // offset camera collision traces' end point
-UHookRelativeIntermediate HookSetCollisionOffsetAlt1(
-    "HookCollisionOffsetAlt1",
-    PATTERN_COLLISION_ALT1,
+UHookRelativeIntermediate HookSetCollisionOffset(
+    "HookCollisionOffset",
+    PATTERN_COLLISION_OFFSET,
     5,
-    &SetCollisionOffsetAlt1
+    &SetCollisionOffset
 );
 
 /*
@@ -461,11 +462,11 @@ std::vector<uint16_t> PATTERN_COLLISION_ADJUST1 = { 0x0F, 0x59, 0xD4, 0x0F, 0x59
 // the collision function sets a location for the camera when the collision trace hits
 // which is unintentionally offset
 // this reverts the offset
-UHookRelativeIntermediate HookCollisionAdjust1(
-    "HookCollisionAdjust1",
+UHookRelativeIntermediate HookCollisionAdjust(
+    "HookCollisionAdjust",
     PATTERN_COLLISION_ADJUST1,
     6,
-    &AdjustCollision1
+    &AdjustCollision
 );
 
 /*
@@ -616,14 +617,14 @@ DWORD WINAPI MainThread(LPVOID lpParam)
 {
     Config.ReadFile(ModUtils::GetModuleFolderPath() + "\\config.ini");
 
-    std::vector<UHookRelativeIntermediate*> hooks {
+    std::vector<UModSwitch*> hooks {
         &HookGetFrametime,
         &HookGetCameraData,
         &HookCameraSettings,
         &HookSetCameraOffset,
-        &HookSetCollisionOffsetAlt,
-        &HookSetCollisionOffsetAlt1,
-        &HookCollisionAdjust1,
+        &DisableCollisionCheck,
+        &HookSetCollisionOffset,
+        &HookCollisionAdjust,
         &HookTargetOffset,
     };
     if (Config.bUseAutoDisable)
@@ -643,7 +644,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
     {
         hooks.push_back(&HookTargetYOffset);
     }
-    for (UHookRelativeIntermediate* hook : hooks)
+    for (UModSwitch* hook : hooks)
     {
         hook->Enable();
     }
@@ -658,7 +659,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         }
         if (ModUtils::CheckHotkey(0x71))
         {
-            for (UHookRelativeIntermediate* pHook : hooks)
+            for (UModSwitch* pHook : hooks)
             {
                 pHook->Toggle();
             }
@@ -672,7 +673,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         {
             if (Config.Keys.Toggle && ModUtils::CheckHotkey(Config.Keys.Toggle))
             {
-                for (UHookRelativeIntermediate* pHook : hooks)
+                for (UModSwitch* pHook : hooks)
                 {
                     pHook->Toggle();
                 }

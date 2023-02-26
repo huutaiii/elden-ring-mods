@@ -293,7 +293,14 @@ namespace ModUtils
 		}
 
 		Log("Stopped at: %p, num regions checked: %i", currentAddress, numRegionsChecked);
-		if (!failSilently) RaiseError("Could not find signature! " + msg);
+		if (failSilently)
+		{
+			Log("Could not find signature. " + msg);
+		}
+		else
+		{
+			RaiseError("Could not find signature! " + msg);
+		}
 		return 0;
 	}
 

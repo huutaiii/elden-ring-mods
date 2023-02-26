@@ -102,8 +102,18 @@ public:
     // there's no deallocation 'cause we don't need it, for now
 };
 
+class UModSwitch
+{
+protected:
+    bool bIsEnabled = false;
+public:
+    virtual void Enable() { bIsEnabled = true; }
+    virtual void Disable() { bIsEnabled = false; }
+    virtual void Toggle() { bIsEnabled ? Disable() : Enable(); }
+};
+
 // writes an absolute jump to destination at specified address (14 bytes)
-class UHookAbsoluteNoCopy
+class UHookAbsoluteNoCopy : public UModSwitch
 {
     static const uint16_t op = 0x25ff;
 
@@ -130,7 +140,7 @@ public:
 // First jump to an intermediate address at which we then do an absolute jump to the custom code
 // This way we don't have to determine the size of the custom asm
 // We also copy the stolen bytes over to the intermediate location so the custom code can omit the original code
-class UHookRelativeIntermediate
+class UHookRelativeIntermediate : public UModSwitch
 {
 public:
     static const uint8_t OpCall = 0xE8;
@@ -282,7 +292,7 @@ public:
 
     const bool HasFoundSignature() const { return bCanHook; }
 
-    void Enable()
+    void Enable() override
     {
         if (!lpIntermediate)
         {
@@ -311,7 +321,7 @@ public:
         fnEnable();
         bEnabled = true;
     }
-    void Disable()
+    void Disable() override
     {
         if (!bEnabled) { return; }
         ModUtils::Log("Disabling hook '%s' from %p to %p", msg.c_str(), lpHook, lpDestination);
@@ -320,7 +330,7 @@ public:
         fnDisable();
         bEnabled = false;
     }
-    void Toggle()
+    void Toggle() override
     {
         bEnabled ? Disable() : Enable();
     }
@@ -329,3 +339,67 @@ public:
 
 const std::vector<uint8_t> UHookRelativeIntermediate::RSPUp({ 0x48, 0x8D, 0x64, 0x24, 0x08 });
 const std::vector<uint8_t> UHookRelativeIntermediate::RSPDown({ 0x48, 0x8D, 0x64, 0x24, 0xf8 });
+
+class UMemReplace : public UModSwitch
+{
+    unsigned int Length;
+    LPVOID lpDestination = nullptr;
+    LPVOID lpBackup = nullptr;
+    std::string Msg;
+    std::vector<unsigned char> Replacement;
+
+public:
+    UMemReplace(std::string name, std::vector<uint16_t> signature, std::vector<uint8_t> replacement, unsigned int length, int offset = 0)
+        : Msg(name), Length(length), Replacement(replacement)
+    {
+        if (replacement.size() > length)
+        {
+            ModUtils::RaiseError(Msg + ": Invalid arguments");
+        }
+
+        lpDestination = reinterpret_cast<LPVOID>(ModUtils::SigScan(signature, Msg, true));
+        if (!lpDestination)
+        {
+            ModUtils::RaiseError("Cannot find signature for memory replacement: " + Msg);
+        }
+        else
+        {
+            lpDestination = LPBYTE(lpDestination) + offset;
+        }
+    }
+
+    void Enable() override
+    {
+        lpBackup = MVirtualAlloc::Get().Alloc(Length);
+        if (lpBackup)
+        {
+            ModUtils::MemCopy(uintptr_t(lpBackup), uintptr_t(lpDestination), Length);
+        }
+        else
+        {
+            ModUtils::RaiseError("Cannot allocate memory for: " + Msg);
+        }
+
+        ModUtils::MemSet(uintptr_t(lpDestination), 0x90, Length);
+        ModUtils::MemCopy(uintptr_t(lpDestination), uintptr_t(Replacement.data()), Replacement.size());
+
+        ModUtils::Log("(%s) replaced memory at %p", Msg.c_str(), lpDestination);
+
+        UModSwitch::Enable();
+    }
+
+    void Disable() override
+    {
+        if (!lpBackup)
+        {
+            return;
+        }
+
+        ModUtils::MemCopy(uintptr_t(lpDestination), uintptr_t(lpBackup), Length);
+
+        ModUtils::Log("(%s) restored memory at %p", Msg.c_str(), lpDestination);
+
+        UModSwitch::Disable();
+    }
+};
+
