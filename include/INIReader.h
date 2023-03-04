@@ -47,6 +47,12 @@ https://github.com/benhoyt/inih
 #define __INI_H__
 
 #include <algorithm>
+
+#include <stdio.h>
+#include <sstream>
+#include <vector>
+#include <iterator>
+#include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -54,12 +60,6 @@ https://github.com/benhoyt/inih
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdio.h>
-#include <sstream>
-#include <vector>
-#include <iterator>
-#include <string>
 
 /* Typedef for prototype of handler function. */
 typedef int (*ini_handler)(void* user, const char* section,
@@ -393,6 +393,10 @@ public:
     bool GetBoolean(const std::string& section, const std::string& name, bool default_value) const;
 
     template<glm::length_t L, typename T, glm::qualifier Q>
+    static bool ParseVec(const std::string& valstr, glm::vec<L, T, Q> &outvec, bool fill_result = true);
+
+    // Fills other components with 0 when input has fewer components than defined
+    template<glm::length_t L, typename T, glm::qualifier Q>
     glm::vec<L, T, Q> GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const;
 
 protected:
@@ -483,21 +487,34 @@ inline bool INIReader::GetBoolean(const std::string& section, const std::string&
 }
 
 template<glm::length_t L, typename T, glm::qualifier Q>
-inline glm::vec<L, T, Q> INIReader::GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const
+static bool INIReader::ParseVec(const std::string& valstr, glm::vec<L, T, Q> &outvec, bool fill_result)
 {
-    std::string valstr = Get(section, name, "");
     // replace unwanted characters with ' '
-    std::replace_if(valstr.begin(), valstr.end(), [](unsigned char c) { return std::string("0123456789.-").find(c) == std::string::npos; }, ' ');
-    std::istringstream stream(valstr);
+    std::string loc_valstr(valstr);
+    std::replace_if(loc_valstr.begin(), loc_valstr.end(), [](unsigned char c) { return std::string("0123456789.-").find(c) == std::string::npos; }, ' ');
+    std::istringstream stream(loc_valstr);
     std::istream_iterator<double> iterator(stream);
     std::istream_iterator<double> end;
     #pragma warning(suppress:4244)
     std::vector<T> result(iterator, end);
-    if (result.size() == L)
+    if (result.size() == L || (fill_result && result.size() <= L))
     {
-        glm::vec<L, T, Q> rvec;
-        memcpy(glm::value_ptr(rvec), result.data(), sizeof(glm::vec<L, T, Q>));
-        return rvec;
+        // maybe outvec needn't have been pass by reference?
+        memset(glm::value_ptr(outvec), 0, sizeof(glm::vec<L, T, Q>));
+        memcpy(glm::value_ptr(outvec), result.data(), sizeof(result[0]) * result.size());
+        return true;
+    }
+    return false;
+}
+
+template<glm::length_t L, typename T, glm::qualifier Q>
+inline glm::vec<L, T, Q> INIReader::GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const
+{
+    std::string valstr = Get(section, name, "");
+    glm::vec<L, T, Q> value;
+    if (ParseVec(valstr, value))
+    {
+        return value;
     }
     return default_value;
 }

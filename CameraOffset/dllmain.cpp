@@ -38,6 +38,12 @@ struct FModConfig
     bool bUseTargetOffset = false;
     bool bUseAutoDisable = false;
 
+    glm::vec2 AutoToggleVelocity = {};
+    float AutoToggleVelocityInterpSpeed = 0;
+    bool bAutoToggleTorrent = false;
+
+    bool bLockonAutoToggle = false;
+
     struct UKeys
     {
         int Toggle = 0;
@@ -60,6 +66,14 @@ struct FModConfig
         bUseTargetOffset = ini.GetBoolean("main", "use-offset-on-target", bUseTargetOffset);
         bUseAutoDisable = ini.GetBoolean("main", "auto-toggle", false);
 
+        AutoToggleVelocity = ini.GetVec("main", "auto-toggle-velocity", AutoToggleVelocity);
+        AutoToggleVelocity.y = max(AutoToggleVelocity.x, AutoToggleVelocity.y);
+
+        AutoToggleVelocityInterpSpeed = ini.GetFloat("main", "auto-toggle-velocity-interpolation", AutoToggleVelocityInterpSpeed);
+        bAutoToggleTorrent = ini.GetBoolean("main", "auto-toggle-torrent", bAutoToggleTorrent);
+
+        bLockonAutoToggle = ini.GetBoolean("main", "lockon-use-auto-toggle", bLockonAutoToggle);
+
         Keys.Toggle = ini.GetInteger("keybinding", "toggle-hooks", Keys.Toggle);
         Keys.ToggleOffset = ini.GetInteger("keybinding", "toggle-offset", Keys.ToggleOffset);
 
@@ -80,7 +94,6 @@ struct FModConfig
         ReadINI(INIReader(path));
     }
 };
-//FModConfig Config = { {.75f, 0.f, 0.f}, {1.f, 0.f, 0.f}, 10.f, 1.2f };
 FModConfig Config;
 
 struct FCameraData
@@ -108,6 +121,7 @@ struct FCameraData
     float MaxDistance = 0;
 
     bool bIsLockedOn = false;
+    bool bOnTorrent = false;
 
     uint32_t ParamID = 0;
 
@@ -115,7 +129,7 @@ private:
     glm::vec4 PrevLocPivot;
 
 public:
-    glm::vec3 PivotVelocity;
+    glm::vec3 PivotDeltaPos;
 
     void Update(LPVOID BaseAddr = nullptr)
     {
@@ -136,9 +150,10 @@ public:
         // .x = distance with collision but lower?, .y and .z each has a slightly different interpolation speed, no collision
         MaxDistance = MemToGLM(baseAddr + 0x1B0).z;
         bIsLockedOn = (*(char*)(baseAddr + 0x49B) & 0x01) != 0;
+        bOnTorrent = (*(baseAddr + 0x488) & 1) != 0;
         ParamID = *(uint32_t*)(baseAddr + 0x460);
 
-        PivotVelocity = LocPivot - PrevLocPivot;
+        PivotDeltaPos = LocPivot - PrevLocPivot;
         PrevLocPivot = LocPivot;
     }
 
@@ -204,11 +219,12 @@ const int EnableOffsetDelay = 2;
 int EnableOffsetElapsed = 0;
 const WORD CritAnimDelay = 15;
 
-bool Control = true;
+bool bUseOffsetUsr = true;
 
+// Oh goodness the size of this
 extern "C" void CalcCameraOffset()
 {
-    if (!Control)
+    if (!bUseOffsetUsr)
     {
         TargetOffset = _mm_set_ps(0, 0, 0, 0);
         MaxDistanceInterp = CameraData.MaxDistance;
@@ -250,6 +266,11 @@ extern "C" void CalcCameraOffset()
         CritAnimElapsed = min(CritAnimElapsed + 1, CritAnimDelay + 1);
         CritAlpha = InterpToF(CritAlpha, CritAnimElapsed < CritAnimDelay ? 1.f : 0.f, CritAnimElapsed < CritAnimDelay ? 5.f : 2.f, Frametime);
     }
+
+    float OffsetInteractAlpha = 1.f;
+    float OffsetVelocityAlpha = 1.f;
+    float OffsetTorrentAlpha = 1.f;
+
     if (Config.bUseAutoDisable)
     {
         // some interactions don't set the pointer, like getting hugs from Fia
@@ -264,7 +285,27 @@ extern "C" void CalcCameraOffset()
         {
             EnableOffsetElapsed = min(++EnableOffsetElapsed, EnableOffsetDelay + 1);
         }
-        ToggleAlpha = InterpToF(ToggleAlpha, EnableOffsetElapsed > EnableOffsetDelay ? 1.f : 0.f, 5.f, Frametime);
+        OffsetInteractAlpha = EnableOffsetElapsed > EnableOffsetDelay ? 1.f : 0.f;
+    }
+    if (Config.bAutoToggleTorrent)
+    {
+        OffsetTorrentAlpha = CameraData.bOnTorrent ? 0.f : 1.f;
+    }
+    if (Config.AutoToggleVelocity.x + Config.AutoToggleVelocity.y > 0.f)
+    {
+        static float Speed = 0.f;
+        float TargetSpeed = safediv(glm::length(CameraData.PivotDeltaPos * glm::vec3(1, 0, 1)), Frametime);
+        Speed = InterpToFConstant(Speed, TargetSpeed, Config.AutoToggleVelocityInterpSpeed, Frametime);
+        OffsetVelocityAlpha = 1.f - smoothstep(Config.AutoToggleVelocity.x, Config.AutoToggleVelocity.y, Speed);
+    }
+
+    if (!Config.bLockonAutoToggle)
+    {
+        ToggleAlpha = InterpToF(ToggleAlpha, CameraData.bIsLockedOn ? 1.f : OffsetInteractAlpha * OffsetTorrentAlpha * OffsetVelocityAlpha, 5.f, Frametime);
+    }
+    else
+    {
+        ToggleAlpha = InterpToF(ToggleAlpha, OffsetInteractAlpha * OffsetTorrentAlpha * OffsetVelocityAlpha, 5.f, Frametime);
     }
 
     float offsetAlpha = ToggleAlpha * (1.f - CritAlpha);
@@ -282,8 +323,9 @@ extern "C" void CalcCameraOffset()
     {
         static glm::vec3 MovementOffsetInterp = {};
 
-        glm::vec3 localvelocity = glm::inverse(rotation) * glm::vec4(CameraData.PivotVelocity, 0);
+        glm::vec3 localvelocity = glm::inverse(rotation) * glm::vec4(CameraData.PivotDeltaPos, 0);
         localvelocity = ClampVecLength(localvelocity, 1.f);
+
         glm::vec3 scale = glm::vec3(Config.LookAhead * 10.f);
         scale.y = 0.f;
         if (Config.LookAheadZ >= 0.f)
@@ -656,8 +698,9 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
+            printf("CamParamId = %d\n", CameraData.ParamID);
         }
-        if (ModUtils::CheckHotkey(0x71))
+        if (ModUtils::CheckHotkey(0x74))
         {
             for (UModSwitch* pHook : hooks)
             {
@@ -680,7 +723,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
             }
             if (Config.Keys.ToggleOffset && ModUtils::CheckHotkey(Config.Keys.ToggleOffset))
             {
-                Control = !Control;
+                bUseOffsetUsr = !bUseOffsetUsr;
             }
         }
     }

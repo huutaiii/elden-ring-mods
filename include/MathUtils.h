@@ -66,7 +66,16 @@ template<typename T>
 inline T oneminus(T x) { return T(1) - x; }
 
 template<typename T>
-inline T reciprocal(T x) { return T(1) / x; }
+inline T rcp(T x) { return T(1) / x; }
+
+template<typename T, typename Tresult>
+inline Tresult sign(T x) { return Tresult(x >= T(0) ? 1 : -1); }
+
+template<typename T, typename Tresult>
+inline Tresult signz(T x) { return x == 0 ? 0 : sign<T, Tresult>(x); }
+
+template<typename T>
+inline T safediv(T x, T y) { return x == 0 ? 0 : x / y; }
 
 template<typename T> T EaseInOutSine(T x) {
     return T(-(cos(PI * x) - 1) / 2);
@@ -142,7 +151,7 @@ inline T InterpSToF(T current, T target, double speed, double deltaTime, double 
     }
 
     T deltaInterp = T(delta * delta * saturate(deltaTime * speed));
-    deltaInterp = (deltaInterp > 0.f ? 1.f : -1.f) * min(abs(deltaInterp), abs(delta));
+    deltaInterp = sign(delta) * min(deltaInterp, abs(delta));
     return current + deltaInterp;
 }
 
