@@ -74,7 +74,7 @@ struct FModConfig
 
         bLockonAutoToggle = ini.GetBoolean("main", "lockon-use-auto-toggle", bLockonAutoToggle);
 
-        Keys.Toggle = ini.GetInteger("keybinding", "toggle-hooks", Keys.Toggle);
+        Keys.Toggle = ini.GetInteger("keybinding", "toggle-Hooks", Keys.Toggle);
         Keys.ToggleOffset = ini.GetInteger("keybinding", "toggle-offset", Keys.ToggleOffset);
 
         //ModUtils::Log("offset: %s", glm::to_string(Offset).c_str());
@@ -443,8 +443,8 @@ eldenring.exe.text+3B27D7 - 75 27                 - jne eldenring.exe.text+3B280
 */
 std::vector<uint16_t> PATTERN_CAMERA_OFFSET = { 0x0F, 0x29, MASK, MASK, MASK, MASK, MASK, 0x0F, 0x29, MASK, MASK, MASK, MASK, MASK, 0x48, 0x83, 0x3D, MASK, MASK, MASK, MASK, MASK, 0x48, 0x89, 0xAC, MASK, MASK, MASK, MASK, MASK, 0x75, MASK };
 // offsets the camera's final position
-UHookRelativeIntermediate HookSetCameraOffset(
-    "HookSetCameraOffset",
+UHookRelativeIntermediate HookCameraOffset(
+    "HookCameraOffset",
     PATTERN_CAMERA_OFFSET,
     7,
     &SetCameraOffset
@@ -483,7 +483,7 @@ BA ????0000 48 8B CF 0F29 75 D0 F3 0F11 44 24 20 E8 ????????
 */
 std::vector<uint16_t> PATTERN_COLLISION_OFFSET = { 0xBA, MASK, MASK, 0x00, 0x00, 0x48, 0x8B, 0xCF, 0x0F, 0x29, 0x75, 0xD0, 0xF3, 0x0F, 0x11, 0x44, 0x24, 0x20, 0xE8, MASK, MASK, MASK, MASK };
 // offset camera collision traces' end point
-UHookRelativeIntermediate HookSetCollisionOffset(
+UHookRelativeIntermediate HookCollisionOffset(
     "HookCollisionOffset",
     PATTERN_COLLISION_OFFSET,
     5,
@@ -659,57 +659,88 @@ DWORD WINAPI MainThread(LPVOID lpParam)
 {
     Config.ReadFile(ModUtils::GetModuleFolderPath() + "\\config.ini");
 
-    std::vector<UModSwitch*> hooks {
+    std::vector<UModSwitch*> HooksData{
         &HookGetFrametime,
         &HookGetCameraData,
         &HookCameraSettings,
-        &HookSetCameraOffset,
-        &DisableCollisionCheck,
-        &HookSetCollisionOffset,
-        &HookCollisionAdjust,
+    };
+
+    std::vector<UModSwitch*> HooksOffset{
+        &HookCameraOffset,
         &HookTargetOffset,
     };
+
+    std::vector<UModSwitch*> HooksCollision{
+        &DisableCollisionCheck,
+        &HookCollisionOffset,
+        &HookCollisionAdjust,
+    };
+
+    std::vector<UModSwitch*> Hooks;
+
+    Hooks.insert(Hooks.end(), HooksData.begin(), HooksData.end());
+    Hooks.insert(Hooks.end(), HooksOffset.begin(), HooksOffset.end());
+    Hooks.insert(Hooks.end(), HooksCollision.begin(), HooksCollision.end());
+
     if (Config.bUseAutoDisable)
     {
-        hooks.push_back(&HookInteractState);
-        hooks.push_back(&HookCriticalAtk);
+        Hooks.push_back(&HookInteractState);
+        Hooks.push_back(&HookCriticalAtk);
     }
     if (Config.SpringbackSpeed > 0)
     {
-        hooks.push_back(&HookMaxDistanceClamp);
+        Hooks.push_back(&HookMaxDistanceClamp);
     }
     if (Config.bUseTargetOffset || Config.bUseSideSwitch || Config.TargetAimAreaMul != 1.f)
     {
-        hooks.push_back(&HookTargetViewOffset);
+        Hooks.push_back(&HookTargetViewOffset);
     }
     if (Config.TargetViewOffsetMul != 1.f)
     {
-        hooks.push_back(&HookTargetYOffset);
+        Hooks.push_back(&HookTargetYOffset);
     }
-    for (UModSwitch* hook : hooks)
-    {
-        hook->Enable();
-    }
-
 
 #ifdef _DEBUG
+
+    bool* switches = (bool*)MVirtualAlloc::Get().Alloc(Hooks.size(), 0x10);
+    memset(switches, 1, Hooks.size());
+
     while (true)
     {
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
             printf("CamParamId = %d\n", CameraData.ParamID);
+            printf("offset ptr = %p", &CameraOffset);
+        }
+        if (ModUtils::CheckHotkey(0x71))
+        {
+            for (int i = 0; i < Hooks.size(); ++i)
+            {
+                printf("%02X %s\n", i, Hooks[i]->GetName().c_str());
+            }
         }
         if (ModUtils::CheckHotkey(0x74))
         {
-            for (UModSwitch* pHook : hooks)
+            for (int i = 0; i < Hooks.size(); ++i)
             {
-                pHook->Toggle();
+                switches[i] = !switches[i];
             }
         }
-        Sleep(2);
+
+        for (int i = 0; i < Hooks.size(); ++i)
+        {
+            switches[i] ? Hooks[i]->Enable() : Hooks[i]->Disable();
+        }
+
+        Sleep(8);
     }
 #else
+    for (UModSwitch* hook : Hooks)
+    {
+        hook->Enable();
+    }
+
     if (Config.Keys.Toggle || Config.Keys.ToggleOffset)
     {
         while (true)

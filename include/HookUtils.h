@@ -68,14 +68,12 @@ public:
     // see VirtualAlloc function
     // 
     // dwSize in [1..4096]
-    LPVOID Alloc(SIZE_T dwSize, DWORD flAllocType = MEM_RESERVE | MEM_COMMIT, DWORD flProtec = PAGE_EXECUTE_READWRITE)
+    LPVOID Alloc(SIZE_T dwSize, SIZE_T alignment = 1, DWORD flAllocType = MEM_RESERVE | MEM_COMMIT, DWORD flProtec = PAGE_EXECUTE_READWRITE)
     {
-        if (dwSize > sys.dwPageSize)
-        {
-            return nullptr;
-        }
+        size_t rem = bytesAllocated % alignment;
+        size_t padding = rem ? 0 : alignment - (rem);
 
-        bytesAllocated += static_cast<DWORD>(dwSize);
+        bytesAllocated += padding + dwSize;
 
         if (!lpCurrent || bytesAllocated > currentPageSize)
         {
@@ -110,6 +108,9 @@ public:
     virtual void Enable() { bIsEnabled = true; }
     virtual void Disable() { bIsEnabled = false; }
     virtual void Toggle() { bIsEnabled ? Disable() : Enable(); }
+    virtual bool IsEnabled() { return bIsEnabled; }
+
+    virtual std::string GetName() = 0;
 };
 
 // writes an absolute jump to destination at specified address (14 bytes)
@@ -134,6 +135,8 @@ public:
     {
         this->lpHook = static_cast<LPBYTE>(lpHook) + offset;
     }
+
+    std::string GetName() { return ""; }
 };
 
 // Creates or removes a hook using a relative jump (5 bytes)
@@ -292,8 +295,12 @@ public:
 
     const bool HasFoundSignature() const { return bCanHook; }
 
+    std::string GetName() override { return msg; }
+
     void Enable() override
     {
+        if (bEnabled) { return; }
+
         if (!lpIntermediate)
         {
             Init();
@@ -305,7 +312,6 @@ public:
             return;
         }
 
-        if (bEnabled) { return; }
         ModUtils::Log("Enabling hook '%s' from %p to %p", msg.c_str(), lpHook, lpDestination);
 
         // pad the jump in case numBytes > jump instruction size
@@ -324,6 +330,7 @@ public:
     void Disable() override
     {
         if (!bEnabled) { return; }
+
         ModUtils::Log("Disabling hook '%s' from %p to %p", msg.c_str(), lpHook, lpDestination);
         ModUtils::MemCopy(uintptr_t(lpHook), uintptr_t(lpIntermediate) + StolenBytesOffset, numBytes);
 
@@ -368,8 +375,12 @@ public:
         }
     }
 
+    std::string GetName() { return Msg; }
+
     void Enable() override
     {
+        if (IsEnabled()) { return; }
+
         lpBackup = MVirtualAlloc::Get().Alloc(Length);
         if (lpBackup)
         {
@@ -390,6 +401,8 @@ public:
 
     void Disable() override
     {
+        if (!IsEnabled()) { return; }
+
         if (!lpBackup)
         {
             return;
