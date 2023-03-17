@@ -711,10 +711,11 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
             printf("CamParamId = %d\n", CameraData.ParamID);
-            printf("offset ptr = %p", &CameraOffset);
+            printf("offset ptr = %p\n", &CameraOffset);
         }
         if (ModUtils::CheckHotkey(0x71))
         {
+            printf("%p\n", switches);
             for (int i = 0; i < Hooks.size(); ++i)
             {
                 printf("%02X %s\n", i, Hooks[i]->GetName().c_str());

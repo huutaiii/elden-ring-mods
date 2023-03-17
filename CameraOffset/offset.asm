@@ -18,25 +18,34 @@ extern TargetViewOffset : xmmword
 extern TargetViewMaxOffset : dword
 
 .data
-	iCollision byte 0
+	bApplyOffset byte 1
 
 .code
 	SetCameraOffset proc
+		push rax
+		mov al, [bApplyOffset]
+		test al, al
+		je skip_offset
 		addps xmm1, [CameraOffset]
+
+		skip_offset:
+		mov [bApplyOffset], 1
+		pop rax
 		ret
 	SetCameraOffset endp
 
 	SetCollisionOffset proc
-		addps xmm6, [RetractCollisionOffset]
+		addps xmm6, [CollisionOffset]
 		ret
 	SetCollisionOffset endp
 
 	AdjustCollision proc
-		subps xmm2, [CameraOffset]
+		;subps xmm2, [CameraOffset]
 
 		; this only runs when there's collision in current frame
 		mov [bLastCollisionHit], 1
 		movaps [LastCollisionPos], xmm2
+		mov [bApplyOffset], 0
 
 		; somehow the value lived through the collision function in xmm5, may not work forever
 		movss [LastCollisionDistNormalized], xmm5
