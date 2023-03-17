@@ -74,7 +74,7 @@ struct FModConfig
 
         bLockonAutoToggle = ini.GetBoolean("main", "lockon-use-auto-toggle", bLockonAutoToggle);
 
-        Keys.Toggle = ini.GetInteger("keybinding", "toggle-Hooks", Keys.Toggle);
+        Keys.Toggle = ini.GetInteger("keybinding", "toggle-hooks", Keys.Toggle);
         Keys.ToggleOffset = ini.GetInteger("keybinding", "toggle-offset", Keys.ToggleOffset);
 
         //ModUtils::Log("offset: %s", glm::to_string(Offset).c_str());

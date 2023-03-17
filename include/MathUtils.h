@@ -75,7 +75,7 @@ template<typename T, typename Tresult>
 inline Tresult signz(T x) { return x == 0 ? 0 : sign<T, Tresult>(x); }
 
 template<typename T>
-inline T safediv(T x, T y) { return x == 0 ? 0 : x / y; }
+inline T safediv(T x, T y) { return (x == 0 && y == 0) ? 0 : x / y; }
 
 template<typename T> T EaseInOutSine(T x) {
     return T(-(cos(PI * x) - 1) / 2);
