@@ -51,15 +51,14 @@ extern CalcSpringbackOffset : proto
 		pop rax
 
 		push rax
-		mov al, [bApplyOffset]
+		mov al, [bLastCollisionHit]
 		test al, al
-		je skip_offset
+		jne skip_offset
 
 		addps xmm1, [CameraOffset]
 		addps xmm1, [SpringbackOffset]
 
 		skip_offset:
-		mov [bApplyOffset], 1
 		pop rax
 
 		ret
@@ -68,6 +67,7 @@ extern CalcSpringbackOffset : proto
 	SetCollisionOffset proc
 		addps xmm6, [CollisionOffset]
 		movaps [LastCollisionEnd], xmm6
+		mov [bLastCollisionHit], 0
 
 		ret
 	SetCollisionOffset endp
@@ -78,7 +78,6 @@ extern CalcSpringbackOffset : proto
 		; this only runs when there's collision in current frame
 		mov [bLastCollisionHit], 1
 		movaps [LastCollisionPos], xmm2
-		mov [bApplyOffset], 0
 
 		ret
 	AdjustCollision endp

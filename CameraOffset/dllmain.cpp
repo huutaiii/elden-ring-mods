@@ -397,7 +397,6 @@ extern "C" void CalcCameraOffset()
         CameraOffset = GLMtoXMM(cameraOffsetInterp);
     }
 
-    bLastCollisionHit = false;
 }
 
 /*
