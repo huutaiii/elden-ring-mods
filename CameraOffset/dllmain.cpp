@@ -363,7 +363,6 @@ extern "C" void CalcCameraOffset()
 
     float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
     glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 1, 1), 1);
-    glm::vec3 collisionOffset = cameraOffset;
 
     static float TargetDistAdjust = 1.f;
     if (CameraData.bIsLockedOn)
@@ -381,22 +380,17 @@ extern "C" void CalcCameraOffset()
             glm::vec3 targetOffset = cameraOffset * lerp(0.f, -.1f, smoothstep(2.f, 5.f, targetDistance)) * targetDistance;
             TargetOffset = GLMtoXMM(targetOffset);
         }
+        TargetDistAdjust = lerp(1.f, TargetDistAdjust, LockonAlpha);
     }
     else
     {
         TargetDistAdjust = InterpToF(TargetDistAdjust, 1.f, 2.f, Frametime);
     }
     cameraOffset *= TargetDistAdjust;
-    collisionOffset *= TargetDistAdjust;
 
     glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
-    glm::vec3 collisionOffsetInterp = cameraOffsetInterp;
-    CollisionOffset = GLMtoXMM(collisionOffsetInterp);
-
-    {
-        CameraOffset = GLMtoXMM(cameraOffsetInterp);
-    }
-
+    CollisionOffset = GLMtoXMM(cameraOffsetInterp);
+    CameraOffset = GLMtoXMM(cameraOffsetInterp);
 }
 
 /*
