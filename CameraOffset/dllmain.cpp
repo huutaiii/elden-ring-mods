@@ -731,7 +731,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         {
             if (Config.Keys.Toggle && ModUtils::CheckHotkey(Config.Keys.Toggle))
             {
-                for (UModSwitch* pHook : hooks)
+                for (UModSwitch* pHook : Hooks)
                 {
                     pHook->Toggle();
                 }
