@@ -3,6 +3,7 @@
 extern CameraOffset : xmmword
 extern CollisionOffset : xmmword
 extern TargetOffset : xmmword
+extern TargetBaseOffset : xmmword
 
 extern SpringbackOffset : xmmword
 
@@ -83,7 +84,8 @@ extern CalcSpringbackOffset : proto
 	AdjustCollision endp
 
 	SetTargetOffset proc
-		subps xmm9, [CameraOffset]
+		;subps xmm9, [CameraOffset]
+		addps xmm9, [TargetBaseOffset]
 		addps xmm9, [TargetOffset]
 		ret
 	SetTargetOffset endp

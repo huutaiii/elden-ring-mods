@@ -184,6 +184,7 @@ extern "C"
     __m128 CameraOffset;
     __m128 CollisionOffset;
     __m128 TargetOffset;
+    __m128 TargetBaseOffset;
 
     void GetFrametime();
     void GetCameraData();
@@ -329,7 +330,7 @@ extern "C" void CalcCameraOffset()
     }
 
     float offsetAlpha = ToggleAlpha * (1.f - CritAlpha);
-    glm::vec3 localMaxOffset = lerp(Config.Offset, Config.OffsetLockon, LockonAlpha) * offsetAlpha;
+    glm::vec3 localMaxOffset = Config.Offset * offsetAlpha;
 
     {
         static float GraceInterp = 0.f;
@@ -362,35 +363,32 @@ extern "C" void CalcCameraOffset()
     
 
     float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
-    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 1, 1), 1);
+    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset, 1);
 
-    static float TargetDistAdjust = 1.f;
+    static glm::vec3 cameraOffsetLockon;
     if (CameraData.bIsLockedOn)
     {
-        // distance in Y plane
-        float targetDistance = glm::length((CameraData.LocTarget - CameraData.LocPivotInterp).xyz * glm::vec3(1, 0, 1));
-        //glm::vec3 targetOffset = cameraOffset * (0.0625f * (-1.f) * pow(targetDistance > 1.f ? targetDistance : pow(targetDistance, 1 / targetDistance), 1.125f));
+        glm::vec3 charForward = glm::normalize((CameraData.LocTarget.xyz - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1));
+        glm::vec3 up(0, 1, 0);
+        glm::mat4x4 matLockon = glm::mat3x3(glm::cross(up, charForward), up, charForward);
+        matLockon[3][3] = 1.f;
 
-        // clamp offset when locked on to avoid the camera spinning around
-        TargetDistAdjust = 1.f - 1 / exp2(targetDistance);
-        TargetDistAdjust *= TargetDistAdjust;
+        cameraOffsetLockon = matLockon * glm::vec4(Config.OffsetLockon * glm::vec3(SideSwitch, 1, 1), 1.f);
 
         if (Config.bUseTargetOffset)
         {
-            glm::vec3 targetOffset = cameraOffset * lerp(0.f, -.1f, smoothstep(2.f, 5.f, targetDistance)) * targetDistance;
+            float targetDistance = glm::length((CameraData.LocTarget - CameraData.LocPivotInterp).xyz * glm::vec3(1, 0, 1));
+            // this is dumb
+            glm::vec3 targetOffset = cameraOffsetLockon * lerp(0.f, -.1f, smoothstep(2.f, 5.f, targetDistance)) * targetDistance;
             TargetOffset = GLMtoXMM(targetOffset);
         }
-        TargetDistAdjust = lerp(1.f, TargetDistAdjust, LockonAlpha);
     }
-    else
-    {
-        TargetDistAdjust = InterpToF(TargetDistAdjust, 1.f, 2.f, Frametime);
-    }
-    cameraOffset *= TargetDistAdjust;
+    cameraOffset = lerp(cameraOffset, cameraOffsetLockon, LockonAlpha);
 
     glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
     CollisionOffset = GLMtoXMM(cameraOffsetInterp);
     CameraOffset = GLMtoXMM(cameraOffsetInterp);
+    TargetBaseOffset = GLMtoXMM(-cameraOffsetInterp);
 }
 
 /*
@@ -688,6 +686,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
             printf("CamBaseAddr = %p\n", CamBaseAddr);
             printf("CamParamId = %d\n", CameraData.ParamID);
             printf("offset ptr = %p\n", &CameraOffset);
+            printf("config ptr = %p\n", &Config);
         }
         if (ModUtils::CheckHotkey(0x71))
         {
