@@ -168,9 +168,19 @@ extern "C"
     LPVOID CamSettingsPtr;
 
     // world space
+    __m128 LastWorldPos;
+    // world space
+    __m128 LastCollisionStart;
+    // local space
     __m128 LastCollisionPos;
+    // local
+    __m128 LastCollisionEnd;
+
     bool bLastCollisionHit;
     float LastCollisionDistNormalized;
+
+    // out, world
+    __m128 SpringbackOffset;
 
     uint64_t InteractPtr;
 
@@ -220,6 +230,27 @@ int EnableOffsetElapsed = 0;
 const WORD CritAnimDelay = 15;
 
 bool bUseOffsetUsr = true;
+
+extern "C" void CalcSpringbackOffset()
+{
+    static float DistanceInterp;
+
+    //glm::vec3 Start = XMMtoGLM(LastCollisionStart);
+    glm::vec3 End = XMMtoGLM(LastCollisionEnd);
+    float MaxDistance = glm::length(End);
+    float Distance = MaxDistance;
+    if (bLastCollisionHit)
+    {
+        glm::vec3 Hit = XMMtoGLM(LastCollisionPos);
+        Distance = glm::length(Hit);
+        //printf("%f %f\n", glm::length(End), glm::length(Hit));
+    }
+    DistanceInterp = InterpToF(DistanceInterp, Distance, bLastCollisionHit ? 0 : Config.SpringbackSpeed, Frametime);
+    glm::vec3 TraceDir = glm::normalize(End);
+    glm::vec3 Offset = TraceDir * (DistanceInterp - MaxDistance);
+    //printf("%s %f\n", glm::to_string(Offset).c_str(), glm::length(Offset));
+    SpringbackOffset = GLMtoXMM(Offset);
+}
 
 // Oh goodness the size of this
 extern "C" void CalcCameraOffset()
@@ -389,8 +420,10 @@ extern "C" void CalcCameraOffset()
     }
 
     {
-        CameraOffset = GLMtoXMM(cameraOffsetInterp * lerp(MaxDistanceInterp / CameraData.MaxDistance, 1.f, 0.75f));
+        CameraOffset = GLMtoXMM(cameraOffsetInterp/* * lerp(MaxDistanceInterp / CameraData.MaxDistance, 1.f, 0.75f)*/);
     }
+
+    //CalcSpringbackOffset();
 
     bLastCollisionHit = false;
 }
@@ -687,10 +720,10 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         Hooks.push_back(&HookInteractState);
         Hooks.push_back(&HookCriticalAtk);
     }
-    if (Config.SpringbackSpeed > 0)
-    {
-        Hooks.push_back(&HookMaxDistanceClamp);
-    }
+    //if (Config.SpringbackSpeed > 0)
+    //{
+    //    Hooks.push_back(&HookMaxDistanceClamp);
+    //}
     if (Config.bUseTargetOffset || Config.bUseSideSwitch || Config.TargetAimAreaMul != 1.f)
     {
         Hooks.push_back(&HookTargetViewOffset);
