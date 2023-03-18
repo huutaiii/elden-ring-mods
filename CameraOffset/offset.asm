@@ -2,8 +2,6 @@
 ; in
 extern CameraOffset : xmmword
 extern CollisionOffset : xmmword
-extern RetractCollisionOffset : xmmword
-extern MaxDistanceInterp : dword
 extern TargetOffset : xmmword
 
 extern SpringbackOffset : xmmword
@@ -12,12 +10,9 @@ extern TargetAimAreaMul : dword
 extern TargetViewOffsetMul : dword
 
 ;out
-extern LastWorldPos : xmmword
 extern bLastCollisionHit : byte
 extern LastCollisionPos : xmmword
-extern LastCollisionStart : xmmword
 extern LastCollisionEnd : xmmword
-extern LastCollisionDistNormalized : dword
 
 extern TargetViewOffset : xmmword
 extern TargetViewMaxOffset : dword
@@ -67,18 +62,11 @@ extern CalcSpringbackOffset : proto
 		mov [bApplyOffset], 1
 		pop rax
 
-		movaps [LastWorldPos], xmm1
-
 		ret
 	SetCameraOffset endp
 
 	SetCollisionOffset proc
 		addps xmm6, [CollisionOffset]
-
-		xorps xmm1, xmm1
-		movaps xmm1, [rbp-20h]
-		movaps [LastCollisionStart], xmm1
-		addps xmm1, xmm6
 		movaps [LastCollisionEnd], xmm6
 
 		ret
@@ -92,16 +80,8 @@ extern CalcSpringbackOffset : proto
 		movaps [LastCollisionPos], xmm2
 		mov [bApplyOffset], 0
 
-		; somehow the value lived through the collision function in xmm5, may not work forever
-		movss [LastCollisionDistNormalized], xmm5
-
 		ret
 	AdjustCollision endp
-
-	ClampMaxDistance proc
-		movss xmm0, [MaxDistanceInterp]
-		ret
-	ClampMaxDistance endp
 
 	SetTargetOffset proc
 		subps xmm9, [CameraOffset]

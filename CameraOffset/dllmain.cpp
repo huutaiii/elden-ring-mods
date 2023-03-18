@@ -167,17 +167,12 @@ extern "C"
     LPVOID CamBaseAddr;
     LPVOID CamSettingsPtr;
 
-    // world space
-    __m128 LastWorldPos;
-    // world space
-    __m128 LastCollisionStart;
     // local space
     __m128 LastCollisionPos;
     // local
     __m128 LastCollisionEnd;
 
     bool bLastCollisionHit;
-    float LastCollisionDistNormalized;
 
     // out, world
     __m128 SpringbackOffset;
@@ -188,9 +183,7 @@ extern "C"
     // out
     __m128 CameraOffset;
     __m128 CollisionOffset;
-    __m128 RetractCollisionOffset;
     __m128 TargetOffset;
-    float MaxDistanceInterp;
 
     void GetFrametime();
     void GetCameraData();
@@ -231,11 +224,11 @@ const WORD CritAnimDelay = 15;
 
 bool bUseOffsetUsr = true;
 
+// called just before applying offset, after collision checks
 extern "C" void CalcSpringbackOffset()
 {
     static float DistanceInterp;
 
-    //glm::vec3 Start = XMMtoGLM(LastCollisionStart);
     glm::vec3 End = XMMtoGLM(LastCollisionEnd);
     float MaxDistance = glm::length(End);
     float Distance = MaxDistance;
@@ -243,12 +236,10 @@ extern "C" void CalcSpringbackOffset()
     {
         glm::vec3 Hit = XMMtoGLM(LastCollisionPos);
         Distance = glm::length(Hit);
-        //printf("%f %f\n", glm::length(End), glm::length(Hit));
     }
     DistanceInterp = InterpToF(DistanceInterp, Distance, bLastCollisionHit ? 0 : Config.SpringbackSpeed, Frametime);
     glm::vec3 TraceDir = glm::normalize(End);
     glm::vec3 Offset = TraceDir * (DistanceInterp - MaxDistance);
-    //printf("%s %f\n", glm::to_string(Offset).c_str(), glm::length(Offset));
     SpringbackOffset = GLMtoXMM(Offset);
 }
 
@@ -258,11 +249,9 @@ extern "C" void CalcCameraOffset()
     if (!bUseOffsetUsr)
     {
         TargetOffset = _mm_set_ps(0, 0, 0, 0);
-        MaxDistanceInterp = CameraData.MaxDistance;
         TargetAimAreaMul = 1.f;
         TargetViewOffsetMul = 1.f;
         CollisionOffset = _mm_set_ps(0, 0, 0, 0);
-        RetractCollisionOffset = _mm_set_ps(0, 0, 0, 0);
         CameraOffset = GLMtoXMM(InterpToV(XMMtoGLM(CameraOffset), glm::vec4(0), 5.f, Frametime));
         return;
     }
@@ -403,27 +392,10 @@ extern "C" void CalcCameraOffset()
     glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
     glm::vec3 collisionOffsetInterp = cameraOffsetInterp;
     CollisionOffset = GLMtoXMM(collisionOffsetInterp);
-    RetractCollisionOffset = GLMtoXMM(collisionOffsetInterp * RetractAlpha);
-
-    //if (!bLastCollisionHit)
-    //{
-    //    LastCollisionDistNormalized = InterpToF(LastCollisionDistNormalized * CameraData.MaxDistance, CameraData.MaxDistance, 1, Frametime) / CameraData.MaxDistance;
-    //}
-    if (bLastCollisionHit)
-    {
-        MaxDistanceInterp = LastCollisionDistNormalized * CameraData.MaxDistance;
-    }
-    //else
-    {
-        MaxDistanceInterp = InterpToF(MaxDistanceInterp, CameraData.MaxDistance, Config.SpringbackSpeed, Frametime);
-        //MaxDistanceInterp = CameraData.MaxDistance;
-    }
 
     {
-        CameraOffset = GLMtoXMM(cameraOffsetInterp/* * lerp(MaxDistanceInterp / CameraData.MaxDistance, 1.f, 0.75f)*/);
+        CameraOffset = GLMtoXMM(cameraOffsetInterp);
     }
-
-    //CalcSpringbackOffset();
 
     bLastCollisionHit = false;
 }
@@ -542,24 +514,6 @@ UHookRelativeIntermediate HookCollisionAdjust(
     PATTERN_COLLISION_ADJUST1,
     6,
     &AdjustCollision
-);
-
-/*
-eldenring.exe+3B8E88 - 76 0E                 - jna eldenring.exe+3B8E98
-eldenring.exe+3B8E8A - F3 0F10 81 B4010000   - movss xmm0,[rcx+000001B4]
-eldenring.exe+3B8E92 - F3 0F5E C1            - divss xmm0,xmm1
-eldenring.exe+3B8E96 - EB 08                 - jmp eldenring.exe+3B8EA0
-eldenring.exe+3B8E98 - F3 0F10 05 087AE802   - movss xmm0,[eldenring.exe+32408A8]
-eldenring.exe+3B8EA0 - 0FC6 C0 00            - shufps xmm0,xmm0,00
-76 0E F3 0F10 81 ????0000 F3 0F5E C1 EB 08 F3 0F10 05 ????????
-*/
-std::vector<uint16_t> PATTERN_MAX_DISTANCE_CLAMP = { 0x76, 0x0E, 0xF3, 0x0F, 0x10, 0x81, MASK, MASK, 0x00, 0x00, 0xF3, 0x0F, 0x5E, 0xC1, 0xEB, 0x08, 0xF3, 0x0F, 0x10, 0x05, MASK, MASK, MASK, MASK };
-UHookRelativeIntermediate HookMaxDistanceClamp(
-    "HookMaxDistanceClamp",
-    PATTERN_MAX_DISTANCE_CLAMP,
-    8,
-    &ClampMaxDistance,
-    2
 );
 
 /*
@@ -720,10 +674,6 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         Hooks.push_back(&HookInteractState);
         Hooks.push_back(&HookCriticalAtk);
     }
-    //if (Config.SpringbackSpeed > 0)
-    //{
-    //    Hooks.push_back(&HookMaxDistanceClamp);
-    //}
     if (Config.bUseTargetOffset || Config.bUseSideSwitch || Config.TargetAimAreaMul != 1.f)
     {
         Hooks.push_back(&HookTargetViewOffset);
