@@ -400,22 +400,32 @@ extern "C" void CalcCameraOffset()
 }
 
 /*
-    eldenring.exe.text+3B1CCF - 44 0F28 F9            - movaps xmm15,xmm1
-    eldenring.exe.text+3B1CD3 - 48 8B F1              - mov rsi,rcx
-    eldenring.exe.text+3B1CD6 - 4D 85 F6              - test r14,r14
-    eldenring.exe.text+3B1CD9 - 75 2E                 - jne eldenring.exe.text+3B1D09
-    eldenring.exe.text+3B1CDB - 48 8D 0D 1FDC8803     - lea rcx,[eldenring.exe.data+229901]
-    eldenring.exe.text+3B1CE2 - E8 79A2A701           - call eldenring.exe.text+1E2BF60
-    eldenring.exe.text+3B1CE7 - 4C 8B C8              - mov r9,rax
+eldenring.exe.text+3B1CCF - 44 0F28 F9            - movaps xmm15,xmm1
+eldenring.exe.text+3B1CD3 - 48 8B F1              - mov rsi,rcx
+eldenring.exe.text+3B1CD6 - 4D 85 F6              - test r14,r14
+eldenring.exe.text+3B1CD9 - 75 2E                 - jne eldenring.exe.text+3B1D09
+eldenring.exe.text+3B1CDB - 48 8D 0D 1FDC8803     - lea rcx,[eldenring.exe.data+229901]
+eldenring.exe.text+3B1CE2 - E8 79A2A701           - call eldenring.exe.text+1E2BF60
+eldenring.exe.text+3B1CE7 - 4C 8B C8              - mov r9,rax
+
+eldenring.exe+3B472F - 48 8D 45 00           - lea rax,[rbp+00]
+eldenring.exe+3B4733 - 4D 8B C6              - mov r8,r14
+eldenring.exe+3B4736 - 4C 8D 4C 24 40        - lea r9,[rsp+40]
+eldenring.exe+3B473B - 48 89 44 24 20        - mov [rsp+20],rax
+eldenring.exe+3B4740 - 41 0F28 CF            - movaps xmm1,xmm15
+eldenring.exe+3B4744 - 48 8B CE              - mov rcx,rsi
+eldenring.exe+3B4747 - E8 64310000           - call eldenring.exe+3B78B0
+48 8D 45 00 4D 8B C6 4C 8D 4C 24 40 48 89 44 24 20
 */
-std::vector<uint16_t> PATTERN_CAMERA_DATA = { 0x48, 0x8B, 0xf1, 0x4d, 0x85, 0xf6, 0x75, MASK, 0x48, 0x8D, 0x0d, MASK, MASK, MASK, MASK, 0xE8, MASK, MASK, MASK, MASK, 0x4C, 0x8B, 0xc8 };
+//std::vector<uint16_t> PATTERN_CAMERA_DATA = { 0x48, 0x8B, 0xf1, 0x4d, 0x85, 0xf6, 0x75, MASK, 0x48, 0x8D, 0x0d, MASK, MASK, MASK, MASK, 0xE8, MASK, MASK, MASK, MASK, 0x4C, 0x8B, 0xc8 };
+std::vector<uint16_t> PATTERN_CAMERA_DATA = { 0x48, 0x8D, 0x45, 0x00, 0x4D, 0x8B, 0xC6, 0x4C, 0x8D, 0x4C, 0x24, 0x40, 0x48, 0x89, 0x44, 0x24, 0x20 };
 // Read the camera data struct from the game
 UHookRelativeIntermediate HookGetCameraData(
     "HookGetCameraData",
     PATTERN_CAMERA_DATA,
     7,
-    &GetCameraData,
-    -4
+    &GetCameraData/*,
+    -4*/
 );
 
 /*

@@ -20,10 +20,14 @@ extern CritAnimElapsed : word
 		push rdx
 		push r8
 		push r9
+		lea rsp, [rsp-10h]
+		movaps [rsp], xmm15
 
 		call ReadCameraData
 		call CalcCameraOffset
 
+		movaps xmm15, [rsp]
+		lea rsp, [rsp+10h]
 		pop r9
 		pop r8
 		pop rdx
