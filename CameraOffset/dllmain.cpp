@@ -22,10 +22,35 @@ constexpr unsigned int ID_NPC_INTERACT = 1000000;
 constexpr unsigned int ID_GRACE = 1001000;
 constexpr unsigned int ID_GRACE_TABLE = 1001001;
 
-struct FModConfig
+#ifdef _DEBUG
+struct {
+    float f[8];
+    int i32[8];
+} DGlobals;
+#endif
+
+struct FConstants
 {
+    float LockonInterpInc = 4.f;
+    float LockonInterpDec = 3.f;
+    float TargetPosInterp = 20.f;
+};
+
+struct FModConfig : public FConstants
+{
+#ifdef _DEBUG
+    struct {
+        bool b[4] = { 0, 1, 0, 0 };
+        float f[3] = { 1.f, 1.f };
+    } Debug;
+    glm::vec3 Offset = {};
+    float _padding;
+    glm::vec3 OffsetLockon = {};
+    float _padding1;
+#else
     glm::vec3 Offset = {};
     glm::vec3 OffsetLockon = {};
+#endif
 
     float OffsetInterpSpeed = 0;
     float SpringbackSpeed = 0;
@@ -166,6 +191,7 @@ extern "C"
     float Frametime;
     LPVOID CamBaseAddr;
     LPVOID CamSettingsPtr;
+    uint64_t InteractPtr;
 
     // local space
     __m128 LastCollisionPos;
@@ -176,9 +202,6 @@ extern "C"
 
     // out, world
     __m128 SpringbackOffset;
-
-    uint64_t InteractPtr;
-
 
     // out
     __m128 CameraOffset;
@@ -260,7 +283,7 @@ extern "C" void CalcCameraOffset()
     TargetViewOffsetMul = Config.TargetViewOffsetMul;
     TargetAimAreaMul = Config.TargetAimAreaMul;
 
-    LockonAlpha = InterpToF(LockonAlpha, CameraData.bIsLockedOn ? 1.f : 0.f, CameraData.bIsLockedOn ? 3.f : 2.f, Frametime);
+    LockonAlpha = InterpToF(LockonAlpha, float(CameraData.bIsLockedOn), CameraData.bIsLockedOn ? Config.LockonInterpInc : Config.LockonInterpDec, Frametime);
 
     if (Config.bUseSideSwitch)
     {
@@ -366,14 +389,25 @@ extern "C" void CalcCameraOffset()
     glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset, 1);
 
     static glm::vec3 cameraOffsetLockon;
+    glm::vec3 nearTargetOffset(0);
     if (CameraData.bIsLockedOn)
     {
-        glm::vec3 charForward = glm::normalize((CameraData.LocTarget.xyz - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1));
+        // interpolate target position to avoid snapping when switching targets
+        static glm::vec3 TargetPosInterp;
+        TargetPosInterp = InterpToV(TargetPosInterp, CameraData.LocTarget.xyz(), Config.TargetPosInterp, Frametime);
+
+        // build local space from player to target
+        glm::vec3 charForward = glm::normalize((TargetPosInterp - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1));
         glm::vec3 up(0, 1, 0);
         glm::mat4x4 matLockon = glm::mat3x3(glm::cross(up, charForward), up, charForward);
         matLockon[3][3] = 1.f;
 
         cameraOffsetLockon = matLockon * glm::vec4(Config.OffsetLockon * glm::vec3(SideSwitch, 1, 1), 1.f);
+
+        // trick the game to think the target is further away when they get too close, to keep the camera behind the player
+        float distOverOffset = glm::length((CameraData.LocTarget.xyz - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1)) / glm::length(Config.OffsetLockon * glm::vec3(2, 0, 2));
+        float a = saturate(1 - distOverOffset);
+        nearTargetOffset += (matLockon * glm::vec4(Config.OffsetLockon, 1.f) * a).xyz();
 
         if (Config.bUseTargetOffset)
         {
@@ -388,7 +422,7 @@ extern "C" void CalcCameraOffset()
     glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
     CollisionOffset = GLMtoXMM(cameraOffsetInterp);
     CameraOffset = GLMtoXMM(cameraOffsetInterp);
-    TargetBaseOffset = GLMtoXMM(-cameraOffsetInterp);
+    TargetBaseOffset = GLMtoXMM(-cameraOffsetInterp + nearTargetOffset * LockonAlpha);
 }
 
 /*
@@ -684,9 +718,8 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
-            printf("CamParamId = %d\n", CameraData.ParamID);
-            printf("offset ptr = %p\n", &CameraOffset);
             printf("config ptr = %p\n", &Config);
+            printf("globals ptr = %p\n", &DGlobals);
         }
         if (ModUtils::CheckHotkey(0x71))
         {
