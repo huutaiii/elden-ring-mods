@@ -34,6 +34,9 @@ struct FConstants
     float LockonInterpInc = 4.f;
     float LockonInterpDec = 3.f;
     float TargetPosInterp = 20.f;
+#ifdef _DEBUG
+    float _padding2;
+#endif
 };
 
 struct FModConfig : public FConstants
@@ -407,7 +410,9 @@ extern "C" void CalcCameraOffset()
         // trick the game to think the target is further away when they get too close, to keep the camera behind the player
         float distOverOffset = glm::length((CameraData.LocTarget.xyz - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1)) / glm::length(Config.OffsetLockon * glm::vec3(2, 0, 2));
         float a = saturate(1 - distOverOffset);
+        // I can't decide which is better
         nearTargetOffset += (matLockon * glm::vec4(Config.OffsetLockon, 1.f) * a).xyz();
+        nearTargetOffset += charForward * a;
 
         if (Config.bUseTargetOffset)
         {
@@ -718,7 +723,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
-            printf("config ptr = %p\n", &Config);
+            printf("config ptr = %p + %x\n", &Config, (int)sizeof(FConstants));
             printf("globals ptr = %p\n", &DGlobals);
         }
         if (ModUtils::CheckHotkey(0x71))
