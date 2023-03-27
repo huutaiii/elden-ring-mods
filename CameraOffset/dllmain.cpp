@@ -370,10 +370,11 @@ extern "C" void CalcCameraOffset()
     {
         static glm::vec3 MovementOffsetInterp = {};
 
-        glm::vec3 localvelocity = glm::inverse(rotation) * glm::vec4(CameraData.PivotDeltaPos, 0);
-        localvelocity = ClampVecLength(localvelocity, 1.f);
+        glm::vec3 localvelocity = (glm::inverse(rotation) * glm::vec4(CameraData.PivotDeltaPos, 0)) * safediv(1.f, Frametime);
+        localvelocity = ClampVecLength(localvelocity, 20.f); // the pivot may zip around when in loading screen
+        localvelocity *= 0.125f;
 
-        glm::vec3 scale = glm::vec3(Config.LookAhead * 10.f);
+        glm::vec3 scale = glm::vec3(Config.LookAhead);
         scale.y = 0.f;
         if (Config.LookAheadZ >= 0.f)
         {
@@ -381,8 +382,8 @@ extern "C" void CalcCameraOffset()
         }
 
         bool bIsMoving = glm::length(localvelocity) > 0.0001f;
-        float speed = max(scale.x, scale.z);
-        MovementOffsetInterp = InterpToV(MovementOffsetInterp, CameraData.bIsLockedOn ? glm::vec3(0) : localvelocity * scale, bIsMoving ? speed / 6 : speed / 8, Frametime);
+        float interpSpeed = bIsMoving ? 2.f : 1.f;
+        MovementOffsetInterp = InterpToV(MovementOffsetInterp, CameraData.bIsLockedOn ? glm::vec3(0) : localvelocity * scale, interpSpeed, Frametime);
 
         localMaxOffset += MovementOffsetInterp * offsetAlpha;
     }
