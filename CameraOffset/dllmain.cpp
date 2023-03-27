@@ -227,20 +227,27 @@ bool bUseOffsetUsr = true;
 // called just before applying offset, after collision checks
 extern "C" void CalcSpringbackOffset()
 {
-    static float DistanceInterp;
-
-    glm::vec3 End = XMMtoGLM(LastCollisionEnd);
-    float MaxDistance = glm::length(End);
-    float Distance = MaxDistance;
-    if (bLastCollisionHit)
+    if (Config.SpringbackSpeed > 0.f)
     {
-        glm::vec3 Hit = XMMtoGLM(LastCollisionPos);
-        Distance = glm::length(Hit);
+        static float DistanceInterp;
+
+        glm::vec3 End = XMMtoGLM(LastCollisionEnd);
+        float MaxDistance = glm::length(End);
+        float Distance = MaxDistance;
+        if (bLastCollisionHit)
+        {
+            glm::vec3 Hit = XMMtoGLM(LastCollisionPos);
+            Distance = glm::length(Hit);
+        }
+        DistanceInterp = InterpToF(DistanceInterp, Distance, bLastCollisionHit ? 0 : Config.SpringbackSpeed, Frametime);
+        glm::vec3 TraceDir = glm::length(End) > 0.0001f ? glm::normalize(End) : glm::vec3(0);
+        glm::vec3 Offset = TraceDir * (DistanceInterp - MaxDistance);
+        SpringbackOffset = GLMtoXMM(Offset);
     }
-    DistanceInterp = InterpToF(DistanceInterp, Distance, bLastCollisionHit ? 0 : Config.SpringbackSpeed, Frametime);
-    glm::vec3 TraceDir = glm::normalize(End);
-    glm::vec3 Offset = TraceDir * (DistanceInterp - MaxDistance);
-    SpringbackOffset = GLMtoXMM(Offset);
+    else
+    {
+        SpringbackOffset = GLMtoXMM(glm::vec4(0));
+    }
 }
 
 // Oh goodness the size of this
@@ -268,7 +275,7 @@ extern "C" void CalcCameraOffset()
 
             float ViewOffsetY = XMMtoGLM(TargetViewOffset).y;
             int sign = ViewOffsetY > 0.f ? 1 : -1;
-            float ViewOffsetClamped = clamp(sign * sqrt(abs(ViewOffsetY / TargetViewMaxOffset)), -1.f, 1.f);
+            float ViewOffsetClamped = clamp(sign * sqrt(abs(safediv(ViewOffsetY, TargetViewMaxOffset))), -1.f, 1.f);
             SideSwitch = InterpToF(SideSwitch, ViewOffsetClamped, 2.5f, Frametime);
             //SideSwitch = InterpToF(SideSwitch, ViewOffsetY > 0.f ? 1.f : -1.f, 1.f, Frametime);
         }
@@ -359,10 +366,8 @@ extern "C" void CalcCameraOffset()
 
         localMaxOffset += MovementOffsetInterp * offsetAlpha;
     }
-    
 
-    float RetractAlpha = saturate(glm::distance(CameraData.LocPivotInterp, CameraData.LocFinalInterp) / CameraData.MaxDistance);
-    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset * glm::vec3(lerp(1.f, SideSwitch, LockonAlpha), 1, 1), 1);
+    glm::vec3 cameraOffset = rotation * glm::vec4(localMaxOffset, 1);
 
     static float TargetDistAdjust = 1.f;
     if (CameraData.bIsLockedOn)
@@ -372,7 +377,7 @@ extern "C" void CalcCameraOffset()
         //glm::vec3 targetOffset = cameraOffset * (0.0625f * (-1.f) * pow(targetDistance > 1.f ? targetDistance : pow(targetDistance, 1 / targetDistance), 1.125f));
 
         // clamp offset when locked on to avoid the camera spinning around
-        TargetDistAdjust = 1.f - 1 / exp2(targetDistance);
+        TargetDistAdjust = 1.f - safediv(1.f, exp2(targetDistance));
         TargetDistAdjust *= TargetDistAdjust;
 
         if (Config.bUseTargetOffset)
