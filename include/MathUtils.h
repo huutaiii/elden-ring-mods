@@ -33,6 +33,12 @@ inline float RelativeOffsetAlpha(glm::vec3 offset, float max_distance)
 }
 
 template<typename T>
+inline T safediv(T x, T y) { return (x == 0 || y == 0) ? 0 : x / y; }
+
+template<typename T>
+inline T convnan(T x, T newValue = T(0)) { return isnan(x) ? newValue : x; }
+
+template<typename T>
 inline T min(T a, T b) { return a < b ? a : b; }
 
 template<typename T>
@@ -50,11 +56,12 @@ inline Tv lerp(Tv x, Tv y, Ta a) { a = clamp(a, Ta(0), Ta(1)); return x * ((Ta)1
 template<typename T>
 inline T smoothstep(T edge0, T edge1, T x) {
     x = clamp((x - edge0) / (edge1 - edge0), (T)0, (T)1);
+    if (isnan(x)) return 0;
     return x * x * (3 - 2 * x);
 }
 
 template<typename T>
-inline T maprange(T x, T in_min, T in_max, T out_min, T out_max) { return out_min + (x - in_min) / (in_max - in_min) * (out_max - out_min); }
+inline T maprange(T x, T in_min, T in_max, T out_min, T out_max) { return convnan(out_min + (x - in_min) / (in_max - in_min) * (out_max - out_min)); }
 
 template<typename T>
 inline T mapclamped(T x, T in_min, T in_max, T out_min, T out_max)
@@ -74,10 +81,7 @@ inline Tresult sign(T x) { return Tresult(x >= T(0) ? 1 : -1); }
 template<typename T, typename Tresult>
 inline Tresult signz(T x) { return x == 0 ? 0 : sign<T, Tresult>(x); }
 
-template<typename T>
-inline T safediv(T x, T y) { return (x == 0 && y == 0) ? 0 : x / y; }
-
-template<typename T> T EaseInOutSine(T x) {
+template<typename T> inline T EaseInOutSine(T x) {
     return T(-(cos(PI * x) - 1) / 2);
 }
 
@@ -95,8 +99,8 @@ inline glm::vec<L, T, Q> InterpToV(glm::vec<L, T, Q> current, glm::vec<L, T, Q> 
         return target;
     }
 
-    glm::vec<L, T, Q> vel = delta * clamp(deltaTime * speed, 0.f, 1.f);
-    return current + vel;
+    glm::vec<L, T, Q> d = delta * clamp(deltaTime * speed, 0.f, 1.f);
+    return current + d;
 }
 
 template<glm::length_t L, typename T, glm::qualifier Q>
@@ -114,8 +118,8 @@ inline glm::vec<L, T, Q> InterpSToV(glm::vec<L, T, Q> current, glm::vec<L, T, Q>
     }
 
     T deltaL = glm::length(delta);
-    glm::vec<L, T, Q> vel = glm::normalize(delta) * clamp(deltaL * deltaL * deltaTime * speed, 0.f, deltaL);
-    return current + vel;
+    glm::vec<L, T, Q> d = glm::normalize(delta) * clamp(deltaL * deltaL * deltaTime * speed, 0.f, deltaL);
+    return current + d;
 }
 
 template <typename T>
