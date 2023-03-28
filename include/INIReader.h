@@ -395,9 +395,12 @@ public:
     template<glm::length_t L, typename T, glm::qualifier Q>
     static bool ParseVec(const std::string& valstr, glm::vec<L, T, Q> &outvec, bool fill_result = true);
 
-    // Fills other components with 0 when input has fewer components than defined
     template<glm::length_t L, typename T, glm::qualifier Q>
     glm::vec<L, T, Q> GetVec(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const;
+
+    // Fills other components with 0 when input has fewer components than defined
+    template<glm::length_t L, typename T, glm::qualifier Q>
+    glm::vec<L, T, Q> GetVecFill(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const;
 
 protected:
     int _error;
@@ -512,7 +515,19 @@ inline glm::vec<L, T, Q> INIReader::GetVec(const std::string& section, const std
 {
     std::string valstr = Get(section, name, "");
     glm::vec<L, T, Q> value;
-    if (ParseVec(valstr, value))
+    if (!valstr.empty() && ParseVec(valstr, value, false))
+    {
+        return value;
+    }
+    return default_value;
+}
+
+template<glm::length_t L, typename T, glm::qualifier Q>
+inline glm::vec<L, T, Q> INIReader::GetVecFill(const std::string& section, const std::string& name, glm::vec<L, T, Q> default_value) const
+{
+    std::string valstr = Get(section, name, "");
+    glm::vec<L, T, Q> value;
+    if (!valstr.empty() && ParseVec(valstr, value, true))
     {
         return value;
     }

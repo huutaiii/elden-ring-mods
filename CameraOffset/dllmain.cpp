@@ -94,7 +94,7 @@ struct FModConfig : public FConstants
         bUseTargetOffset = ini.GetBoolean("main", "use-offset-on-target", bUseTargetOffset);
         bUseAutoDisable = ini.GetBoolean("main", "auto-toggle", false);
 
-        AutoToggleVelocity = ini.GetVec("main", "auto-toggle-velocity", AutoToggleVelocity);
+        AutoToggleVelocity = ini.GetVecFill("main", "auto-toggle-velocity", AutoToggleVelocity);
         AutoToggleVelocity.y = max(AutoToggleVelocity.x, AutoToggleVelocity.y);
 
         AutoToggleVelocityInterpSpeed = ini.GetFloat("main", "auto-toggle-velocity-interpolation", AutoToggleVelocityInterpSpeed);
@@ -399,12 +399,11 @@ extern "C" void CalcCameraOffset()
 
     static glm::vec3 cameraOffsetLockon;
     glm::vec3 nearTargetOffset(0);
+    // interpolate target position to avoid snapping when switching targets
+    static glm::vec3 TargetPosInterp;
+    TargetPosInterp = InterpToV(TargetPosInterp, CameraData.bIsLockedOn ? CameraData.LocTarget.xyz() : CameraData.LocPivotInterp.xyz(), Config.TargetPosInterp, Frametime);
     if (CameraData.bIsLockedOn)
     {
-        // interpolate target position to avoid snapping when switching targets
-        static glm::vec3 TargetPosInterp;
-        TargetPosInterp = InterpToV(TargetPosInterp, CameraData.LocTarget.xyz(), Config.TargetPosInterp, Frametime);
-
         // build local space from player to target
         glm::vec3 charForward = glm::normalize((TargetPosInterp - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1));
         glm::vec3 up(0, 1, 0);
@@ -729,7 +728,7 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         if (ModUtils::CheckHotkey(0x70))
         {
             printf("CamBaseAddr = %p\n", CamBaseAddr);
-            printf("config ptr = %p + %x\n", &Config, (int)sizeof(FConstants));
+            printf("config ptr = %p\n", &Config.Offset);
             printf("globals ptr = %p\n", &DGlobals);
         }
         if (ModUtils::CheckHotkey(0x71))
