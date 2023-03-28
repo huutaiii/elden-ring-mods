@@ -27,25 +27,31 @@ extern CalcSpringbackOffset : proto
 		push rax
 		push rcx
 		push rdx
-		lea rsp, [rsp-70h]
-		movaps [rsp], xmm1
-		movaps [rsp+10h], xmm6
-		movaps [rsp+20h], xmm7
-		movaps [rsp+30h], xmm8
-		movaps [rsp+40h], xmm9
-		movaps [rsp+50h], xmm10
-		movaps [rsp+60h], xmm11
+		push r8
+		push r9
+		push r10
+		push r11
+		lea rsp, [rsp-60h]
+		movaps [rsp], xmm0
+		movaps [rsp+10h], xmm1
+		movaps [rsp+20h], xmm2
+		movaps [rsp+30h], xmm3
+		movaps [rsp+40h], xmm4
+		movaps [rsp+50h], xmm5
 		
 		call CalcSpringbackOffset
 		
-		movaps xmm1, [rsp]
-		movaps xmm6, [rsp+10h]
-		movaps xmm7, [rsp+20h]
-		movaps xmm8, [rsp+30h]
-		movaps xmm9, [rsp+40h]
-		movaps xmm10, [rsp+50h]
-		movaps xmm11, [rsp+60h]
-		lea rsp, [rsp+70h]
+		movaps xmm0, [rsp]
+		movaps xmm1, [rsp+10h]
+		movaps xmm2, [rsp+20h]
+		movaps xmm3, [rsp+30h]
+		movaps xmm4, [rsp+40h]
+		movaps xmm5, [rsp+50h]
+		lea rsp, [rsp+60h]
+		pop r11
+		pop r10
+		pop r9
+		pop r8
 		pop rdx
 		pop rcx
 		pop rax
