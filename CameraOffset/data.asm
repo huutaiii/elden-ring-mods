@@ -22,14 +22,28 @@ extern CritAnimElapsed : word
 		push r9
 		push r10
 		push r11
-		lea rsp, [rsp-10h]
-		movaps [rsp], xmm15
+		lea rsp, [rsp-60h]
+		movaps [rsp], xmm0
+		movaps [rsp+10h], xmm1
+		movaps [rsp+20h], xmm2
+		movaps [rsp+30h], xmm3
+		movaps [rsp+40h], xmm4
+		movaps [rsp+50h], xmm5
+
+		; I have no idea why CalcCameraOffset writes up 16 bytes from rsp so this is here to make some margin
+		lea rsp, [rsp-20h]
 
 		call ReadCameraData
 		call CalcCameraOffset
-
-		movaps xmm15, [rsp]
-		lea rsp, [rsp+10h]
+		lea rsp, [rsp+20h]
+		
+		movaps xmm0, [rsp]
+		movaps xmm1, [rsp+10h]
+		movaps xmm2, [rsp+20h]
+		movaps xmm3, [rsp+30h]
+		movaps xmm4, [rsp+40h]
+		movaps xmm5, [rsp+50h]
+		lea rsp, [rsp+60h]
 		pop r11
 		pop r10
 		pop r9
@@ -52,13 +66,15 @@ extern CritAnimElapsed : word
 	GetFrametime endp
 
 	GetInteractState proc
-		lea rcx, [rsp+8]
+		push rcx
+		lea rcx, [rsp+16]
 		push rax
 
 		mov rax, [rcx+4D0h]
 		mov [InteractPtr], rax
 
 		pop rax
+		pop rcx
 		ret
 	GetInteractState endp
 
