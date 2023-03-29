@@ -11,6 +11,8 @@
 #include <glm/gtx/rotate_normalized_axis.hpp>
 #pragma warning(pop)
 
+#pragma comment(lib, "Version.lib")
+
 #include <ModUtils.h>
 #include <HookUtils.h>
 #include <MathUtils.h>
@@ -639,9 +641,27 @@ UHookRelativeIntermediate HookGetFrametime(
     &GetFrametime
 );
 
+std::string PWD;
+UINT64 ERVer;
+std::vector<UModSwitch*> Hooks;
+
 #pragma warning(suppress: 4100)
 DWORD WINAPI MainThread(LPVOID lpParam)
 {
+    {
+        constexpr size_t size = 800;
+        char bufPWD[size];
+        VS_FIXEDFILEINFO *pOut;
+        UINT outSize;
+        GetCurrentDirectoryA(size, bufPWD);
+        PWD = std::string(bufPWD);
+        GetFileVersionInfoA((PWD + "\\eldenring.exe").c_str(), 0, size, bufPWD);
+        VerQueryValueA(bufPWD, "\\", (LPVOID*) & pOut, &outSize);
+        ERVer = UINT64(pOut->dwFileVersionMS) << 32 + UINT64(pOut->dwFileVersionLS);
+    }
+    //ModUtils::Log("Working directory: %s", PWD.c_str());
+    ModUtils::Log("EldenRing version: %p", ERVer);
+
     Config.ReadFile(ModUtils::GetModuleFolderPath() + "\\config.ini");
 
     std::vector<UModSwitch*> HooksData{
@@ -661,7 +681,6 @@ DWORD WINAPI MainThread(LPVOID lpParam)
         &HookCollisionAdjust,
     };
 
-    std::vector<UModSwitch*> Hooks;
 
     Hooks.insert(Hooks.end(), HooksData.begin(), HooksData.end());
     Hooks.insert(Hooks.end(), HooksOffset.begin(), HooksOffset.end());
@@ -757,9 +776,14 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
         DisableThreadLibraryCalls(hModule);
         CreateThread(0, 0, &MainThread, 0, 0, 0);
         break;
+    case DLL_PROCESS_DETACH:
+        for (UModSwitch* pHook : Hooks)
+        {
+            pHook->Disable();
+        }
+        break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
         break;
     }
     return TRUE;
