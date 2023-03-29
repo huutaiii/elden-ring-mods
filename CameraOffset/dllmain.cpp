@@ -128,7 +128,9 @@ FModConfig Config;
 
 struct FCameraData
 {
-    LPVOID BaseAddress = nullptr;
+    glm::mat4x4 PrevWorldToView = {};
+
+    glm::mat4x4 PrevWorldToPivot = {};
 
     // Pivot position (uninterpolated)
     glm::vec4 LocPivot = {};
@@ -154,6 +156,8 @@ struct FCameraData
     bool bOnTorrent = false;
 
     uint32_t ParamID = 0;
+
+    LPVOID BaseAddress = nullptr;
 
 private:
     glm::vec4 PrevLocPivot;
@@ -182,6 +186,9 @@ public:
         bIsLockedOn = (*(char*)(baseAddr + 0x49B) & 0x01) != 0;
         bOnTorrent = (*(baseAddr + 0x488) & 1) != 0;
         ParamID = *(uint32_t*)(baseAddr + 0x460);
+
+        memcpy(glm::value_ptr(PrevWorldToView), baseAddr + 0x10, sizeof(PrevWorldToView));
+        memcpy(glm::value_ptr(PrevWorldToPivot), baseAddr + 0x70, sizeof(PrevWorldToPivot));
 
         PivotDeltaPos = LocPivot - PrevLocPivot;
         PrevLocPivot = LocPivot;
@@ -269,7 +276,7 @@ extern "C" void CalcSpringbackOffset()
             Distance = glm::length(Hit);
         }
         DistanceInterp = InterpToF(DistanceInterp, Distance, bLastCollisionHit ? 0 : Config.SpringbackSpeed, Frametime);
-        glm::vec3 TraceDir = glm::length(End) > 0.0001f ? glm::normalize(End) : glm::vec3(0);
+        glm::vec3 TraceDir = glm::length(End) > SMALL_FLOAT ? glm::normalize(End) : glm::vec3(0);
         glm::vec3 Offset = TraceDir * (DistanceInterp - MaxDistance);
         SpringbackOffset = GLMtoXMM(Offset);
     }
@@ -407,7 +414,8 @@ extern "C" void CalcCameraOffset()
     if (CameraData.bIsLockedOn)
     {
         // build local space from player to target
-        glm::vec3 charForward = glm::normalize((TargetPosInterp - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1));
+        bool bNormSafe = glm::length(TargetPosInterp.xz - CameraData.LocPivotInterp.xz) > SMALL_FLOAT;
+        glm::vec3 charForward = bNormSafe ? glm::normalize((TargetPosInterp - CameraData.LocPivotInterp.xyz) * glm::vec3(1, 0, 1)) : CameraData.PrevWorldToPivot[2].xyz;
         glm::vec3 up(0, 1, 0);
         glm::mat4x4 matLockon = glm::mat3x3(glm::cross(up, charForward), up, charForward);
         matLockon[3][3] = 1.f;
