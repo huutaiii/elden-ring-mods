@@ -36,8 +36,10 @@ struct FConstants
     float LockonInterpInc = 4.f;
     float LockonInterpDec = 3.f;
     float TargetPosInterp = 20.f;
+    float CritInterpInc = 3.f;
+    float CritInterpDec = 2.f;
 #ifdef _DEBUG
-    float _padding2;
+    float _padding2[3];
 #endif
 };
 
@@ -67,7 +69,7 @@ struct FModConfig : public FConstants
     bool bUseSideSwitch = false;
     bool bUseTargetOffset = false;
     bool bUseAutoDisable = false;
-
+    bool bUseAutoToggleCrit = false;
     glm::vec2 AutoToggleVelocity = {};
     float AutoToggleVelocityInterpSpeed = 0;
     bool bAutoToggleTorrent = false;
@@ -96,6 +98,7 @@ struct FModConfig : public FConstants
         bUseTargetOffset = ini.GetBoolean("main", "use-offset-on-target", bUseTargetOffset);
         bUseAutoDisable = ini.GetBoolean("main", "auto-toggle", false);
 
+        bUseAutoToggleCrit = ini.GetBoolean("main", "auto-toggle-critical", bUseAutoToggleCrit);
         AutoToggleVelocity = ini.GetVecFill("main", "auto-toggle-velocity", AutoToggleVelocity);
         AutoToggleVelocity.y = max(AutoToggleVelocity.x, AutoToggleVelocity.y);
 
@@ -256,7 +259,7 @@ float SideSwitch = 1.f;
 float ToggleAlpha = 1.f;
 const int EnableOffsetDelay = 2;
 int EnableOffsetElapsed = 0;
-const WORD CritAnimDelay = 15;
+const WORD CritAnimDelay = 15; // TODO: use time instead of frame count
 
 bool bUseOffsetUsr = true;
 
@@ -323,11 +326,11 @@ extern "C" void CalcCameraOffset()
 
     static float CritAlpha = 0.f;
     bool bCinematicEffectsEnabled = *(LPBYTE(CamSettingsPtr) + 0x11);
-    if (Config.bUseAutoDisable && bCinematicEffectsEnabled)
+    if (Config.bUseAutoToggleCrit && bCinematicEffectsEnabled)
     {
         // maybe only use this when "Cinematic Effects" is turned on?
         CritAnimElapsed = min(CritAnimElapsed + 1, CritAnimDelay + 1);
-        CritAlpha = InterpToF(CritAlpha, CritAnimElapsed < CritAnimDelay ? 1.f : 0.f, CritAnimElapsed < CritAnimDelay ? 5.f : 2.f, Frametime);
+        CritAlpha = InterpToF(CritAlpha, CritAnimElapsed < CritAnimDelay ? 1.f : 0.f, CritAnimElapsed < CritAnimDelay ? Config.CritInterpInc : Config.CritInterpDec, Frametime);
     }
 
     float OffsetInteractAlpha = 1.f;
@@ -437,6 +440,7 @@ extern "C" void CalcCameraOffset()
             TargetOffset = GLMtoXMM(targetOffset);
         }
     }
+    cameraOffsetLockon *= offsetAlpha;
     cameraOffset = lerp(cameraOffset, cameraOffsetLockon, LockonAlpha);
 
     glm::vec3 cameraOffsetInterp = InterpSToV(glm::vec3(XMMtoGLM(CameraOffset)), cameraOffset, Config.OffsetInterpSpeed, Frametime);
