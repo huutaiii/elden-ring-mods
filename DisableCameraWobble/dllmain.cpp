@@ -3,8 +3,8 @@
 #include "ModUtils.h"
 #include "minhook.h"
 
-#include <delayimp.h>
-#pragma comment (lib, "delayimp")
+//#include <delayimp.h>
+//#pragma comment (lib, "delayimp")
 #pragma comment (lib, "../bin/MinHook.x64.lib")
 //#pragma comment (lib, "../bin/MinHook.x64.dll")
 
