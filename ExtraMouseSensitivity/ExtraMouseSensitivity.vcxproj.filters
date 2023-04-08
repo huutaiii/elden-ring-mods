@@ -27,4 +27,7 @@
   <ItemGroup>
     <CopyFileToFolders Include="config.ini" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="disasm_MouseCameraControl.txt" />
+  </ItemGroup>
 </Project>

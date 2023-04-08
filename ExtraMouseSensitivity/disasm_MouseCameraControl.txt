@@ -1,0 +1,65 @@
+
+Disassembly for Elden Ring 1.09
+
+; horizontal mouse input
+eldenring.exe+DEB730 - 40 53                 - push rbx
+eldenring.exe+DEB732 - 48 83 EC 30           - sub rsp,30
+eldenring.exe+DEB736 - 48 8B D9              - mov rbx,rcx
+eldenring.exe+DEB739 - 0F29 74 24 20         - movaps [rsp+20],xmm6
+eldenring.exe+DEB73E - 48 8B 0D 3B2D7103     - mov rcx,[eldenring.exe+44FE480]
+eldenring.exe+DEB745 - 48 85 C9              - test rcx,rcx
+eldenring.exe+DEB748 - 75 2E                 - jne eldenring.exe+DEB778
+eldenring.exe+DEB74A - 48 8D 0D A76DEF02     - lea rcx,[eldenring.exe+3CE24F8]
+eldenring.exe+DEB751 - E8 DA0A0901           - call eldenring.exe+1E7C230
+eldenring.exe+DEB756 - 4C 8B C8              - mov r9,rax
+eldenring.exe+DEB759 - 4C 8D 05 10BB4402     - lea r8,[eldenring.exe+3237270]
+eldenring.exe+DEB760 - BA B4000000           - mov edx,000000B4
+eldenring.exe+DEB765 - 48 8D 0D F4C2B801     - lea rcx,[eldenring.exe+2977A60]
+eldenring.exe+DEB76C - E8 7F8E0801           - call eldenring.exe+1E745F0
+eldenring.exe+DEB771 - 48 8B 0D 082D7103     - mov rcx,[eldenring.exe+44FE480]
+eldenring.exe+DEB778 - E8 B340FFFF           - call eldenring.exe+DDF830
+eldenring.exe+DEB77D - 48 8B CB              - mov rcx,rbx
+eldenring.exe+DEB780 - 0F28 F0               - movaps xmm6,xmm0
+eldenring.exe+DEB783 - E8 28F2FFFF           - call eldenring.exe+DEA9B0
+eldenring.exe+DEB788 - F3 0F59 C6            - mulss xmm0,xmm6
+eldenring.exe+DEB78C - 0F28 74 24 20         - movaps xmm6,[rsp+20]
+eldenring.exe+DEB791 - 48 83 C4 30           - add rsp,30
+eldenring.exe+DEB795 - 5B                    - pop rbx
+eldenring.exe+DEB796 - C3                    - ret 
+
+; vertical mouse input
+eldenring.exe+DEB7A0 - 40 53                 - push rbx
+eldenring.exe+DEB7A2 - 48 83 EC 30           - sub rsp,30
+eldenring.exe+DEB7A6 - 48 8B D9              - mov rbx,rcx
+eldenring.exe+DEB7A9 - 0F29 74 24 20         - movaps [rsp+20],xmm6
+eldenring.exe+DEB7AE - 48 8B 0D CB2C7103     - mov rcx,[eldenring.exe+44FE480]
+eldenring.exe+DEB7B5 - 48 85 C9              - test rcx,rcx
+eldenring.exe+DEB7B8 - 75 2E                 - jne eldenring.exe+DEB7E8
+eldenring.exe+DEB7BA - 48 8D 0D 376DEF02     - lea rcx,[eldenring.exe+3CE24F8]
+eldenring.exe+DEB7C1 - E8 6A0A0901           - call eldenring.exe+1E7C230
+eldenring.exe+DEB7C6 - 4C 8B C8              - mov r9,rax
+eldenring.exe+DEB7C9 - 4C 8D 05 A0BA4402     - lea r8,[eldenring.exe+3237270]
+eldenring.exe+DEB7D0 - BA B4000000           - mov edx,000000B4
+eldenring.exe+DEB7D5 - 48 8D 0D 84C2B801     - lea rcx,[eldenring.exe+2977A60]
+eldenring.exe+DEB7DC - E8 0F8E0801           - call eldenring.exe+1E745F0
+eldenring.exe+DEB7E1 - 48 8B 0D 982C7103     - mov rcx,[eldenring.exe+44FE480]
+eldenring.exe+DEB7E8 - E8 4340FFFF           - call eldenring.exe+DDF830
+eldenring.exe+DEB7ED - 48 8B CB              - mov rcx,rbx
+eldenring.exe+DEB7F0 - 0F28 F0               - movaps xmm6,xmm0
+eldenring.exe+DEB7F3 - E8 A8F2FFFF           - call eldenring.exe+DEAAA0
+eldenring.exe+DEB7F8 - F3 0F59 C6            - mulss xmm0,xmm6
+eldenring.exe+DEB7FC - 0F28 74 24 20         - movaps xmm6,[rsp+20]
+eldenring.exe+DEB801 - 48 83 C4 30           - add rsp,30
+eldenring.exe+DEB805 - 5B                    - pop rbx
+eldenring.exe+DEB806 - C3                    - ret 
+
+
+; the snippet that calls the functions above
+eldenring.exe+3B0532 - 48 8D 4D 27           - lea rcx,[rbp+27]
+eldenring.exe+3B0536 - E8 F5B1A300           - call eldenring.exe+DEB730
+eldenring.exe+3B053B - 0F28 F0               - movaps xmm6,xmm0
+eldenring.exe+3B053E - 48 8D 4D 27           - lea rcx,[rbp+27]
+eldenring.exe+3B0542 - E8 59B2A300           - call eldenring.exe+DEB7A0
+eldenring.exe+3B0547 - F3 0F11 45 07         - movss [rbp+07],xmm0
+eldenring.exe+3B054C - F3 0F11 75 0B         - movss [rbp+0B],xmm6
+48 8D 4D ?? E8 ???????? 0F28 F0 48 8D 4D ?? E8 ???????? F3 0F11 45 07 F3 0F11 75 0B
