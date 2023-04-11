@@ -26,6 +26,7 @@
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="config.ini" />
+    <CopyFileToFolders Include="..\bin\MinHook.x64.dll" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="disasm_MouseCameraControl.txt" />
