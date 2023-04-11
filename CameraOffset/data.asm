@@ -15,6 +15,7 @@ extern CritAnimElapsed : word
 
 		mov [CamBaseAddr], rsi
 
+		; backup volatile registers since we're hook into the middle of a function
 		push rax
 		push rcx
 		push rdx
@@ -30,9 +31,7 @@ extern CritAnimElapsed : word
 		movaps [rsp+40h], xmm4
 		movaps [rsp+50h], xmm5
 
-		; I have no idea why CalcCameraOffset writes up 16 bytes from rsp so this is here to make some margin
-		lea rsp, [rsp-20h]
-
+		lea rsp, [rsp-20h]		; shadow space for function calls
 		call ReadCameraData
 		call CalcCameraOffset
 		lea rsp, [rsp+20h]

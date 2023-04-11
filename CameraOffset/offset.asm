@@ -25,6 +25,8 @@ extern CalcSpringbackOffset : proto
 
 .code
 	SetCameraOffset proc
+
+		; backup registers in the stack
 		push rax
 		push rcx
 		push rdx
@@ -40,7 +42,9 @@ extern CalcSpringbackOffset : proto
 		movaps [rsp+40h], xmm4
 		movaps [rsp+50h], xmm5
 		
+		lea rsp, [rsp-20h]			; allocate shadow space
 		call CalcSpringbackOffset
+		lea rsp, [rsp+20h]
 		
 		movaps xmm0, [rsp]
 		movaps xmm1, [rsp+10h]
