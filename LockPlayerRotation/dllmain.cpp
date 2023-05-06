@@ -104,6 +104,7 @@ glm::vec4 PivotPosUninterp;
 glm::vec4 PrevPivotPos;
 glm::vec3 PivotVelocity;
 bool bIsSprinting;
+bool bIsOnTorrent;
 
 struct TPlayerInput
 {
@@ -133,10 +134,11 @@ struct TPlayerAim
     char _other2[0x6];
     glm::vec4 Target; // +D0 (16B)
     char _other3[0x454];
-    UINT MovementMode;
+    UINT MovementMode; // +534
 };
 
 bool bHasLockon;
+bool bIsIdle;
 
 void (*tram_PlayerAim)(PVOID, bool);
 void hk_PLayerAim(TPlayerAim* pAimData, bool bHasLockon)
@@ -149,7 +151,7 @@ void hk_PLayerAim(TPlayerAim* pAimData, bool bHasLockon)
         return;
     }
 
-    bool bIsIdle = pAimData->MovementMode == EMovement::NORMAL && pAimData->pInput->InputScale == 0.f;
+    bIsIdle = pAimData->MovementMode == EMovement::NORMAL && pAimData->pInput->InputScale == 0.f;
     bool bChangeRotation = Config.bAlwaysTurn ? true : !bIsIdle;
 
     glm::vec3 CamFwd = CameraMatrix * glm::vec4(0, 0, 1, 0);
@@ -199,6 +201,7 @@ void (*tram_FreeMovement)(LPVOID, float);
 void hk_FreeMovement(LPVOID p, float f)
 {
     bCallingMovement = true;
+    bIsOnTorrent = *reinterpret_cast<LPBYTE>(UINT_PTR(p) + 0x1DC);
     tram_FreeMovement(p, f);
     bCallingMovement = false;
 }
@@ -206,11 +209,15 @@ void hk_FreeMovement(LPVOID p, float f)
 void (*tram_SetRotation)(LPVOID, LPVOID);
 void hk_SetRotation(LPVOID p0, LPVOID p1)
 {
-    if (bCallingMovement && !bIsSprinting)
+    bool bSkipRotation = false;
+    if (bCallingMovement && bIsIdle)
     {
-        return;
+        bSkipRotation = !(bIsSprinting || bIsOnTorrent);
     }
-    tram_SetRotation(p0, p1);
+    if (!bSkipRotation)
+    {
+        tram_SetRotation(p0, p1);
+    }
 }
 
 LPVOID CreateHook(std::string id, std::vector<UINT16> pattern, LPVOID pDetour, LPVOID* pTrampoline, int offset = 0)
@@ -234,7 +241,6 @@ LPVOID CreateHook(std::string id, std::vector<UINT16> pattern, LPVOID pDetour, L
 
 DWORD WINAPI MainThread(LPVOID lpParams)
 {
-    UINT_PTR pScan;
     MH_STATUS mh;
 
     mh = MH_Initialize();
@@ -243,7 +249,7 @@ DWORD WINAPI MainThread(LPVOID lpParams)
     CreateHook("CameraTick", PATTERN_CAMERA_TICK, &hk_CameraTick, (LPVOID*)&tram_CameraTick, 0xFC - 0xD8);
     CreateHook("PlayerAim", PATTERN_PLAYER_AIM, &hk_PLayerAim, (LPVOID*)&tram_PlayerAim);
     CreateHook("LockonState", PATTERN_LOCKON_STATE, &hk_GetLockonState, (LPVOID*)&tram_GetLockonState);
-    CreateHook("SpellAim", PATTERN_SPELL_AIM, &hk_SpellAim, (LPVOID*)&tram_SpellAim);
+    CreateHook("SpellAim", PATTERN_SPELL_AIM, &hk_SpellAim, (LPVOID*)&tram_SpellAim, 9);
     CreateHook("FreeMovement", PATTERN_FREE_MOVEMENT, &hk_FreeMovement, (LPVOID*)&tram_FreeMovement, 10);
     CreateHook("SetRotation", PATTERN_SET_ROTATION, &hk_SetRotation, (LPVOID*)&tram_SetRotation);
 
