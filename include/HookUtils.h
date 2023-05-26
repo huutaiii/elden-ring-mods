@@ -150,6 +150,7 @@ public:
     static const uint8_t OpJmp = 0xE9;
     static const unsigned char RelJmpSize = 5;
 
+    const std::string msg;
 private:
     MVirtualAlloc& allocator = MVirtualAlloc::Get();
 
@@ -232,10 +233,10 @@ private:
         {
             *pReturnAddress = reinterpret_cast<uintptr_t>((char*)lpHook + numBytes);
         }
+        ModUtils::Log("Hook target (%s): %p (rel: %#x)", msg.c_str(), lpHook, UINT_PTR(lpHook) - ModUtils::GetProcessBaseAddress(GetCurrentProcessId()));
     }
 
 public:
-    const std::string msg;
 
     UHookRelativeIntermediate(UHookRelativeIntermediate&) = delete;
 

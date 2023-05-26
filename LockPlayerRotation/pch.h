@@ -16,5 +16,6 @@
 
 #include "ModUtils.h"
 #include "MathUtils.h"
+#include "INIReader.h"
 
 #endif //PCH_H
